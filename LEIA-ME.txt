@@ -1,0 +1,20 @@
+COMO USAR
+=========
+
+1. Copia "config.properties.example" para "config.properties" (mesma pasta)
+   e edita-o: mete a tua ligacao a base de dados PostgreSQL, o teu token
+   ZSGO, e ajusta as duas queries (source.clients.query e
+   source.products.query) aos nomes reais das tuas tabelas.
+
+2. Clica duas vezes em "run.bat".
+
+Nao precisas de Java Developer Kit nem Maven instalados na tua maquina -
+so precisas do Java Runtime (java.exe), que ja confirmaste que tens
+(java -version deu 17.0.12).
+
+O programa cria automaticamente duas tabelas de controlo na tua base de
+dados: zsgo_client_sync e zsgo_product_sync. Sao elas que garantem que
+nunca crias o mesmo cliente/produto duas vezes, mesmo correndo isto
+todas as horas.
+
+Ver README.md (no projeto completo) para mais detalhes tecnicos.

@@ -1,0 +1,364 @@
+# Copia este ficheiro para "config.properties" (fora do controlo de versões,
+# porque tem segredos) e ajusta os valores.
+
+# --- Base de dados PostgreSQL ---
+db.url=jdbc:postgresql://localhost:5432/a_tua_base_de_dados
+db.user=o_teu_user
+db.password=a_tua_password
+
+
+# --- API ZSGO ---
+zsgo.baseUrl=https://sandbox.zsgo.pt/api/v1/ext
+zsgo.token=O_TEU_BEARER_TOKEN
+
+# --- Ligar/desligar cada sincronização (true/false) ---
+sync.clients.enabled=true
+sync.products.enabled=false
+
+# Máximo de tentativas antes de desistir de um registo com erro. Este valor
+# aqui é só informativo (não é lido pelo programa) — a condição real está
+# embutida na source.clients.query, mais abaixo (agora sem limite).
+sync.maxAttempts=-1
+
+# ============================================================
+# CLIENTES
+# ============================================================
+
+# Valores por defeito quando a tua tabela não os tiver (exigidos pelo schema do ZSGO).
+zsgo.default.priceLine=1
+zsgo.default.paymentOptionId=
+zsgo.default.paymentMethodId=
+zsgo.default.familyId=1
+zsgo.default.itemTypeCode=S
+zsgo.default.unitCode=UNI
+zsgo.default.saleTax=23
+zsgo.default.exemptionCode=M01
+# Adapta os nomes das TUAS colunas/tabela aqui. Mantém os aliases (AS id, AS nome, ...)
+# exatamente como estão, porque é assim que o programa lê o resultado.
+#
+# Esta query usa uma "marca de água" (watermark) em vez de um LEFT JOIN direto
+# contra zsgo_client_sync: como pode haver vários clientes com o mesmo NIF,
+# não filtramos por NIF já existir — filtramos por id > último id sincronizado
+# com sucesso, mais quem ficou com erro e ainda tem tentativas disponíveis.
+# Por isso o ORDER BY é ASC (a subir a partir do último ponto), não DESC.
+source.clients.query=\
+  SELECT u.id AS id, \
+         u.name AS nome, \
+         COALESCE(vi.string_value, u.email) AS email, \
+         v.string_value AS nif, \
+         a.address_line_1 AS morada, \
+         a.zip AS codigo_postal, \
+         a.city AS cidade, \
+         a.country AS pais, \
+         COALESCE(CAST(regexp_replace(pv_prazo.internal_name, '[^0-9]', '', 'g') AS INTEGER), 0) AS prazo_dias, \
+         COALESCE(vsd.boolean_value, false) AS isento_selo, \
+         COALESCE(viva.string_value, pv_iva.value) AS taxa_iva_codigo, \
+         vat_pct.decimal_value AS taxa_iva_percentagem, \
+         COALESCE(vmot.string_value, pv_motivo.value) AS motivo_isencao, \
+         mot_zsgo.string_value AS motivo_isencao_zsgo_code, \
+         md5(concat_ws('|', \
+             u.name, \
+             COALESCE(vi.string_value, u.email), \
+             v.string_value, \
+             a.address_line_1, \
+             a.zip, \
+             a.city, \
+             a.country, \
+             COALESCE(CAST(regexp_replace(pv_prazo.internal_name, '[^0-9]', '', 'g') AS INTEGER), 0)::text, \
+             COALESCE(vsd.boolean_value, false)::text, \
+             COALESCE(viva.string_value, pv_iva.value), \
+             vat_pct.decimal_value::text, \
+             COALESCE(vmot.string_value, pv_motivo.value), \
+             mot_zsgo.string_value \
+         )) AS content_hash \
+  FROM public.users u \
+  LEFT JOIN public.addresses a \
+    ON a.user_id = u.id \
+   AND a.subclass = 'USER' \
+  LEFT JOIN public.user_custom_fields cf \
+    ON cf.internal_name = 'nif' \
+  LEFT JOIN public.user_custom_field_values v \
+    ON v.owner_id = u.id \
+   AND v.field_id = cf.id \
+  LEFT JOIN public.user_custom_fields cfi \
+    ON cfi.internal_name = 'invoiceemail' \
+  LEFT JOIN public.user_custom_field_values vi \
+    ON vi.owner_id = u.id \
+   AND vi.field_id = cfi.id \
+  LEFT JOIN public.user_custom_fields cfp \
+    ON cfp.internal_name = 'prazo_pagamento' \
+  LEFT JOIN public.user_custom_field_values vp \
+    ON vp.owner_id = u.id \
+   AND vp.field_id = cfp.id \
+  LEFT JOIN public.user_custom_field_possible_values pv_prazo \
+    ON pv_prazo.id = vp.enum_value_id \
+  LEFT JOIN public.user_custom_fields cfsd \
+    ON cfsd.internal_name = 'PF_STAMP_DUTY_EXEMPT' \
+  LEFT JOIN public.user_custom_field_values vsd \
+    ON vsd.owner_id = u.id \
+   AND vsd.field_id = cfsd.id \
+  LEFT JOIN public.user_custom_fields cfiva \
+    ON cfiva.internal_name = 'PF_VATRATETAX' \
+  LEFT JOIN public.user_custom_field_values viva \
+    ON viva.owner_id = u.id \
+   AND viva.field_id = cfiva.id \
+  LEFT JOIN public.user_custom_field_possible_values pv_iva \
+    ON pv_iva.id = viva.enum_value_id \
+  LEFT JOIN public.record_custom_fields rcf_code \
+    ON rcf_code.internal_name = 'SR_VATRATES_F_Code' \
+  LEFT JOIN public.record_custom_field_values vat_code \
+    ON vat_code.field_id = rcf_code.id \
+   AND vat_code.string_value = COALESCE(viva.string_value, pv_iva.value) \
+  LEFT JOIN public.record_custom_fields rcf_tax \
+    ON rcf_tax.internal_name = 'SR_VATRATES_F_TAX' \
+  LEFT JOIN public.record_custom_field_values vat_pct \
+    ON vat_pct.field_id = rcf_tax.id \
+   AND vat_pct.owner_id = vat_code.owner_id \
+  LEFT JOIN public.user_custom_fields cfmot \
+    ON cfmot.internal_name = 'PF_VAT_EXEMPTION_REASON' \
+  LEFT JOIN public.user_custom_field_values vmot \
+    ON vmot.owner_id = u.id \
+   AND vmot.field_id = cfmot.id \
+  LEFT JOIN public.user_custom_field_possible_values pv_motivo \
+    ON pv_motivo.id = vmot.enum_value_id \
+  LEFT JOIN public.record_custom_fields rcf_mot_code \
+    ON rcf_mot_code.internal_name = 'SR_TAX_EXEMPTION_REASONS_F_CODE' \
+  LEFT JOIN public.record_custom_field_values mot_code \
+    ON mot_code.field_id = rcf_mot_code.id \
+   AND mot_code.string_value = COALESCE(vmot.string_value, pv_motivo.value) \
+  LEFT JOIN public.record_custom_fields rcf_mot_zsgo \
+    ON rcf_mot_zsgo.internal_name = 'SR_TAX_EXEMPTION_REASONS_F_ZSGO' \
+  LEFT JOIN public.record_custom_field_values mot_zsgo \
+    ON mot_zsgo.field_id = rcf_mot_zsgo.id \
+   AND mot_zsgo.owner_id = mot_code.owner_id \
+  LEFT JOIN zsgo_client_sync s \
+    ON s.user_id = u.id \
+  WHERE cf.internal_name = 'nif' \
+    AND u.user_group_id IN ( \
+          89, 88, 87, 86, 85, 84, 83, 82, 79, 76, 69, 65, 63, 52, \
+          51, 49, 48, 47, 46, 43, 41, 40, 36, 30, 20, 15, 12, 4 \
+        ) \
+    AND (s.user_id IS NULL OR s.status = 'ERRO') \
+  ORDER BY u.id ASC \
+  LIMIT 200
+
+# Query usada pelo botão "Verificar alterações (todos)" do painel (aba
+# "Clientes"). É praticamente igual à "source.clients.query" acima — MESMOS
+# aliases, MESMA fórmula de content_hash (tem de ser exatamente igual, senão
+# a comparação não faz sentido) — mas SEM o filtro de pendentes/watermark:
+# aqui queremos o estado ATUAL de todos os clientes que já foram (ou podem
+# ter sido) sincronizados, para comparar o content_hash de cada um com o que
+# ficou guardado da última vez. Se um cliente mudou de email de faturação,
+# morada, etc., o hash aqui vem diferente do gravado, e ele aparece como
+# "DESATUALIZADO" na listagem, com opção de reenviar (PATCH) para o ZSGO.
+source.clients.verify.query=\
+  SELECT u.id AS id, \
+         u.name AS nome, \
+         COALESCE(vi.string_value, u.email) AS email, \
+         v.string_value AS nif, \
+         a.address_line_1 AS morada, \
+         a.zip AS codigo_postal, \
+         a.city AS cidade, \
+         a.country AS pais, \
+         COALESCE(CAST(regexp_replace(pv_prazo.internal_name, '[^0-9]', '', 'g') AS INTEGER), 0) AS prazo_dias, \
+         COALESCE(vsd.boolean_value, false) AS isento_selo, \
+         COALESCE(viva.string_value, pv_iva.value) AS taxa_iva_codigo, \
+         vat_pct.decimal_value AS taxa_iva_percentagem, \
+         COALESCE(vmot.string_value, pv_motivo.value) AS motivo_isencao, \
+         mot_zsgo.string_value AS motivo_isencao_zsgo_code, \
+         md5(concat_ws('|', \
+             u.name, \
+             COALESCE(vi.string_value, u.email), \
+             v.string_value, \
+             a.address_line_1, \
+             a.zip, \
+             a.city, \
+             a.country, \
+             COALESCE(CAST(regexp_replace(pv_prazo.internal_name, '[^0-9]', '', 'g') AS INTEGER), 0)::text, \
+             COALESCE(vsd.boolean_value, false)::text, \
+             COALESCE(viva.string_value, pv_iva.value), \
+             vat_pct.decimal_value::text, \
+             COALESCE(vmot.string_value, pv_motivo.value), \
+             mot_zsgo.string_value \
+         )) AS content_hash \
+  FROM public.users u \
+  LEFT JOIN public.addresses a \
+    ON a.user_id = u.id \
+   AND a.subclass = 'USER' \
+  LEFT JOIN public.user_custom_fields cf \
+    ON cf.internal_name = 'nif' \
+  LEFT JOIN public.user_custom_field_values v \
+    ON v.owner_id = u.id \
+   AND v.field_id = cf.id \
+  LEFT JOIN public.user_custom_fields cfi \
+    ON cfi.internal_name = 'invoiceemail' \
+  LEFT JOIN public.user_custom_field_values vi \
+    ON vi.owner_id = u.id \
+   AND vi.field_id = cfi.id \
+  LEFT JOIN public.user_custom_fields cfp \
+    ON cfp.internal_name = 'prazo_pagamento' \
+  LEFT JOIN public.user_custom_field_values vp \
+    ON vp.owner_id = u.id \
+   AND vp.field_id = cfp.id \
+  LEFT JOIN public.user_custom_field_possible_values pv_prazo \
+    ON pv_prazo.id = vp.enum_value_id \
+  LEFT JOIN public.user_custom_fields cfsd \
+    ON cfsd.internal_name = 'PF_STAMP_DUTY_EXEMPT' \
+  LEFT JOIN public.user_custom_field_values vsd \
+    ON vsd.owner_id = u.id \
+   AND vsd.field_id = cfsd.id \
+  LEFT JOIN public.user_custom_fields cfiva \
+    ON cfiva.internal_name = 'PF_VATRATETAX' \
+  LEFT JOIN public.user_custom_field_values viva \
+    ON viva.owner_id = u.id \
+   AND viva.field_id = cfiva.id \
+  LEFT JOIN public.user_custom_field_possible_values pv_iva \
+    ON pv_iva.id = viva.enum_value_id \
+  LEFT JOIN public.record_custom_fields rcf_code \
+    ON rcf_code.internal_name = 'SR_VATRATES_F_Code' \
+  LEFT JOIN public.record_custom_field_values vat_code \
+    ON vat_code.field_id = rcf_code.id \
+   AND vat_code.string_value = COALESCE(viva.string_value, pv_iva.value) \
+  LEFT JOIN public.record_custom_fields rcf_tax \
+    ON rcf_tax.internal_name = 'SR_VATRATES_F_TAX' \
+  LEFT JOIN public.record_custom_field_values vat_pct \
+    ON vat_pct.field_id = rcf_tax.id \
+   AND vat_pct.owner_id = vat_code.owner_id \
+  LEFT JOIN public.user_custom_fields cfmot \
+    ON cfmot.internal_name = 'PF_VAT_EXEMPTION_REASON' \
+  LEFT JOIN public.user_custom_field_values vmot \
+    ON vmot.owner_id = u.id \
+   AND vmot.field_id = cfmot.id \
+  LEFT JOIN public.user_custom_field_possible_values pv_motivo \
+    ON pv_motivo.id = vmot.enum_value_id \
+  LEFT JOIN public.record_custom_fields rcf_mot_code \
+    ON rcf_mot_code.internal_name = 'SR_TAX_EXEMPTION_REASONS_F_CODE' \
+  LEFT JOIN public.record_custom_field_values mot_code \
+    ON mot_code.field_id = rcf_mot_code.id \
+   AND mot_code.string_value = COALESCE(vmot.string_value, pv_motivo.value) \
+  LEFT JOIN public.record_custom_fields rcf_mot_zsgo \
+    ON rcf_mot_zsgo.internal_name = 'SR_TAX_EXEMPTION_REASONS_F_ZSGO' \
+  LEFT JOIN public.record_custom_field_values mot_zsgo \
+    ON mot_zsgo.field_id = rcf_mot_zsgo.id \
+   AND mot_zsgo.owner_id = mot_code.owner_id \
+  WHERE cf.internal_name = 'nif' \
+  ORDER BY u.id ASC
+
+# ============================================================
+# FATURAÇÃO MENSAL (comissões)
+# ============================================================
+
+# --- Endpoint do Cyclos que regista a fatura (PDF + userid) ---
+cyclos.invoice.url=http://localhost:8080/web/run/invoice
+cyclos.invoice.user=o_teu_user_cyclos
+cyclos.invoice.password=a_tua_password_cyclos
+
+invoice.document.type=FR
+invoice.document.series=A
+invoice.maxAttempts=-1
+
+# --- Desempenho: threads em paralelo + limite de pedidos ao ZSGO ---
+# threads: quantos clientes processar ao mesmo tempo.
+# rateLimit: pedidos permitidos por janela de tempo — mantém abaixo do
+# limite real da tua key para nunca receberes 429. Ajusta se descobrires
+# o valor exato (o programa já trata 429 automaticamente de qualquer forma).
+#
+# CONFIGURAÇÃO ATUAL: agressiva, sem travão real — só para veres se e
+# quando aparece 429. Quando confirmares o limite real, volta a meter
+# algo conservador (ex: threads=5, requestsPerWindow=25, windowMillis=60000).
+invoice.threads=20
+invoice.rateLimit.requestsPerWindow=5500
+invoice.rateLimit.windowMillis=60000
+
+# Produto único usado em TODAS as linhas de fatura, por agora (em vez do
+# product_reference por rubrica que a query de faturação também traz).
+invoice.default.productReference=Envio de fundos
+
+# Query parametrizada (2 "?": ano, mes) que traz as linhas agregadas de
+# comissão por cliente/rubrica para o mês pedido. Lê de public.transfers
+# (não de public.transactions), porque é lá que vive o rastreio de
+# chargebacks (charged_back_by_id / chargeback_of_id). Exclui transações
+# que já foram revertidas NO MESMO MÊS (essas não entram na fatura nem
+# geram Nota de Crédito — net zero). O lower() nos dois lados do JOIN à
+# tabela de rubricas evita que diferenças de maiúsculas/minúsculas
+# escondam rubricas inteiras da faturação.
+billing.query=\
+  SELECT \
+      COALESCE(CASE WHEN redir.string_value ~ '^[0-9]+$' THEN redir.string_value::bigint END, a.user_id) AS cliente_id, \
+      s.zsgo_code AS zsgo_code, \
+      t.type_id, \
+      m.transaction_internal_name AS rubrica, \
+      m.cw_service_code AS product_reference, \
+      COUNT(*) AS nr_transacoes, \
+      SUM(t.amount) AS valor_total, \
+      CASE \
+          WHEN COALESCE(CASE WHEN redir.string_value ~ '^[0-9]+$' THEN redir.string_value::bigint END, a.user_id) <> a.user_id \
+          THEN REPLACE(m.rubric_description, '{TRANSACTIONS}', COUNT(*)::text) || ' \u2014 Referente a: ' || u.name \
+          ELSE REPLACE(m.rubric_description, '{TRANSACTIONS}', COUNT(*)::text) \
+      END AS descricao_linha \
+  FROM public.transfers t \
+  JOIN public.transfer_types tt \
+    ON tt.id = t.type_id \
+  JOIN public.lp_cloudware_rubrics_mappings m \
+    ON lower(m.transaction_internal_name) = lower(tt.internal_name) \
+  JOIN public.accounts a \
+    ON a.id = t.from_id \
+  JOIN public.users u \
+    ON u.id = a.user_id \
+  LEFT JOIN public.transfers cb \
+    ON cb.id = t.charged_back_by_id \
+  LEFT JOIN public.user_custom_fields cfredir \
+    ON cfredir.internal_name = 'PF_Invoice_Comissions_To_UserId' \
+  LEFT JOIN public.user_custom_field_values redir \
+    ON redir.owner_id = a.user_id \
+   AND redir.field_id = cfredir.id \
+  LEFT JOIN zsgo_client_sync s \
+    ON s.user_id = COALESCE(CASE WHEN redir.string_value ~ '^[0-9]+$' THEN redir.string_value::bigint END, a.user_id) \
+   AND s.status = 'SINCRONIZADO' \
+  WHERE t.subclass <> 'CHARGEBACK' \
+    AND date_trunc('month', t.date) = make_date(?, ?, 1) \
+    AND (t.charged_back_by_id IS NULL OR date_trunc('month', cb.date) <> date_trunc('month', t.date)) \
+  GROUP BY \
+      COALESCE(CASE WHEN redir.string_value ~ '^[0-9]+$' THEN redir.string_value::bigint END, a.user_id), \
+      s.zsgo_code, a.user_id, u.name, t.type_id, m.transaction_internal_name, m.cw_service_code, m.rubric_description \
+  ORDER BY cliente_id ASC, a.user_id ASC
+
+# ============================================================
+# NOTAS DE CRÉDITO (chargebacks de meses já faturados)
+# ============================================================
+
+# Query parametrizada (2 "?": ano, mes) que traz chargebacks datados no mês
+# pedido cuja transação original é de um mês DIFERENTE (já faturado antes) —
+# só esses geram Nota de Crédito. Os que revertem uma transação do mesmo
+# mês já ficam de fora automaticamente na billing.query acima (net zero).
+creditnote.query=\
+  SELECT \
+      cb.id AS chargeback_id, \
+      orig.id AS transacao_original_id, \
+      COALESCE(CASE WHEN redir.string_value ~ '^[0-9]+$' THEN redir.string_value::bigint END, a.user_id) AS cliente_id, \
+      s.zsgo_code, \
+      cb.amount AS valor_estorno, \
+      m.cw_service_code AS product_reference, \
+      m.rubric_description AS descricao \
+  FROM public.transfers cb \
+  JOIN public.transfers orig \
+    ON orig.id = cb.chargeback_of_id \
+  JOIN public.transfer_types tt \
+    ON tt.id = orig.type_id \
+  JOIN public.lp_cloudware_rubrics_mappings m \
+    ON lower(m.transaction_internal_name) = lower(tt.internal_name) \
+  JOIN public.accounts a \
+    ON a.id = orig.from_id \
+  LEFT JOIN public.user_custom_fields cfredir \
+    ON cfredir.internal_name = 'PF_Invoice_Comissions_To_UserId' \
+  LEFT JOIN public.user_custom_field_values redir \
+    ON redir.owner_id = a.user_id \
+   AND redir.field_id = cfredir.id \
+  LEFT JOIN zsgo_client_sync s \
+    ON s.user_id = COALESCE(CASE WHEN redir.string_value ~ '^[0-9]+$' THEN redir.string_value::bigint END, a.user_id) \
+  LEFT JOIN zsgo_credit_note_sync cn \
+    ON cn.chargeback_id = cb.id \
+  WHERE date_trunc('month', cb.date) = make_date(?, ?, 1) \
+    AND date_trunc('month', orig.date) <> date_trunc('month', cb.date) \
+    AND (cn.chargeback_id IS NULL OR cn.status = 'ERRO') \
+  ORDER BY cliente_id ASC

@@ -1,0 +1,21 @@
+# Segredos (credenciais BD, token ZSGO, credenciais Cyclos) — nunca versionar.
+# Usa config.properties.example como modelo.
+config.properties
+
+# Cópias antigas / pacotes gerados à mão
+*_old.jar
+*_last.jar
+projeto.zip
+*.zip
+
+# Compilação
+*.class
+out/
+build/
+
+# IDE / SO
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
