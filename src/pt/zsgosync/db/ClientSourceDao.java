@@ -35,6 +35,7 @@ public class ClientSourceDao {
             var5.telefone = getOrNull(var4, "telefone");
             var5.prazoDias = getIntOrNull(var4, "prazo_dias");
             var5.isentoSelo = getBooleanOrNull(var4, "isento_selo");
+            var5.sujeitoPassivo = getBooleanOrNull(var4, "sujeito_passivo");
             var5.taxaIvaPercentagem = getOrNull(var4, "taxa_iva_percentagem");
             var5.motivoIsencao = getOrNull(var4, "motivo_isencao");
             var5.motivoIsencaoZsgoCode = getOrNull(var4, "motivo_isencao_zsgo_code");

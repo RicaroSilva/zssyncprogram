@@ -52,6 +52,7 @@ source.clients.query=\
          a.country AS pais, \
          COALESCE(CAST(regexp_replace(pv_prazo.internal_name, '[^0-9]', '', 'g') AS INTEGER), 0) AS prazo_dias, \
          COALESCE(vsd.boolean_value, false) AS isento_selo, \
+         COALESCE(vsp.boolean_value, true) AS sujeito_passivo, \
          COALESCE(viva.string_value, pv_iva.value) AS taxa_iva_codigo, \
          vat_pct.decimal_value AS taxa_iva_percentagem, \
          COALESCE(vmot.string_value, pv_motivo.value) AS motivo_isencao, \
@@ -66,6 +67,7 @@ source.clients.query=\
              a.country, \
              COALESCE(CAST(regexp_replace(pv_prazo.internal_name, '[^0-9]', '', 'g') AS INTEGER), 0)::text, \
              COALESCE(vsd.boolean_value, false)::text, \
+             COALESCE(vsp.boolean_value, true)::text, \
              COALESCE(viva.string_value, pv_iva.value), \
              vat_pct.decimal_value::text, \
              COALESCE(vmot.string_value, pv_motivo.value), \
@@ -97,6 +99,11 @@ source.clients.query=\
   LEFT JOIN public.user_custom_field_values vsd \
     ON vsd.owner_id = u.id \
    AND vsd.field_id = cfsd.id \
+  LEFT JOIN public.user_custom_fields cfsp \
+    ON cfsp.internal_name = 'PF_TAXABLE_PERSON' \
+  LEFT JOIN public.user_custom_field_values vsp \
+    ON vsp.owner_id = u.id \
+   AND vsp.field_id = cfsp.id \
   LEFT JOIN public.user_custom_fields cfiva \
     ON cfiva.internal_name = 'PF_VATRATETAX' \
   LEFT JOIN public.user_custom_field_values viva \
@@ -162,6 +169,7 @@ source.clients.verify.query=\
          a.country AS pais, \
          COALESCE(CAST(regexp_replace(pv_prazo.internal_name, '[^0-9]', '', 'g') AS INTEGER), 0) AS prazo_dias, \
          COALESCE(vsd.boolean_value, false) AS isento_selo, \
+         COALESCE(vsp.boolean_value, true) AS sujeito_passivo, \
          COALESCE(viva.string_value, pv_iva.value) AS taxa_iva_codigo, \
          vat_pct.decimal_value AS taxa_iva_percentagem, \
          COALESCE(vmot.string_value, pv_motivo.value) AS motivo_isencao, \
@@ -176,6 +184,7 @@ source.clients.verify.query=\
              a.country, \
              COALESCE(CAST(regexp_replace(pv_prazo.internal_name, '[^0-9]', '', 'g') AS INTEGER), 0)::text, \
              COALESCE(vsd.boolean_value, false)::text, \
+             COALESCE(vsp.boolean_value, true)::text, \
              COALESCE(viva.string_value, pv_iva.value), \
              vat_pct.decimal_value::text, \
              COALESCE(vmot.string_value, pv_motivo.value), \
@@ -207,6 +216,11 @@ source.clients.verify.query=\
   LEFT JOIN public.user_custom_field_values vsd \
     ON vsd.owner_id = u.id \
    AND vsd.field_id = cfsd.id \
+  LEFT JOIN public.user_custom_fields cfsp \
+    ON cfsp.internal_name = 'PF_TAXABLE_PERSON' \
+  LEFT JOIN public.user_custom_field_values vsp \
+    ON vsp.owner_id = u.id \
+   AND vsp.field_id = cfsp.id \
   LEFT JOIN public.user_custom_fields cfiva \
     ON cfiva.internal_name = 'PF_VATRATETAX' \
   LEFT JOIN public.user_custom_field_values viva \

@@ -300,6 +300,10 @@ public class ZsgoApiClient {
          var2.append(",\"tax_id\":").append(jsonString(var1.nif));
       }
 
+      if (var1.sujeitoPassivo != null) {
+         var2.append(",\"tax_subject\":").append(var1.sujeitoPassivo);
+      }
+
       var2.append("}");
       StringBuilder var3 = new StringBuilder("{");
       var3.append("\"country_code\":").append(jsonString(notBlank(var1.pais) ? var1.pais : "PT"));

@@ -12,6 +12,7 @@ public class SourceClient {
    public String telefone;
    public Integer prazoDias;
    public Boolean isentoSelo;
+   public Boolean sujeitoPassivo;
    public String taxaIvaPercentagem;
    public String motivoIsencao;
    public String motivoIsencaoZsgoCode;
@@ -41,6 +42,8 @@ public class SourceClient {
          + this.prazoDias
          + ", isentoSelo="
          + this.isentoSelo
+         + ", sujeitoPassivo="
+         + this.sujeitoPassivo
          + ", taxaIvaPercentagem='"
          + this.taxaIvaPercentagem
          + "', motivoIsencao='"
