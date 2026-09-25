@@ -129,6 +129,7 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       this.header = this.montarCabecalho();
       this.add(this.header, "North");
       this.abaResumo = this.painelResumo;
+      this.painelResumo.aoMudarMes(var1x -> this.carregarResumo());
       this.abaClientes = this.montarAbaClientes();
       this.abaFaturacao = this.montarAbaFaturacao();
       this.abaListaClientes = this.montarAbaListaClientes();
@@ -175,7 +176,7 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
    private void carregarResumo() {
       new Thread(() -> {
          try {
-            YearMonth var1 = mesAnteriorPadrao();
+            YearMonth var1 = this.painelResumo.getMes();
             DashboardService.Resumo var2 = DashboardRun.obter(this.appConfigInicial, var1);
             SwingUtilities.invokeLater(() -> this.painelResumo.mostrar(var2));
          } catch (Exception var3) {
