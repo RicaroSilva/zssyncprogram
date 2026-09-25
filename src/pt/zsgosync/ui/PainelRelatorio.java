@@ -91,6 +91,7 @@ public class PainelRelatorio extends JPanel implements Tema.TemaOuvinte {
       var1.add(var2);
       this.add(var1, "North");
       this.estilizarTabela(this.tabelaErros, new int[]{90, 150, 560});
+      DetalheErro.instalar(this.tabelaErros, 1, 2);
       this.estilizarTabela(this.tabelaLinhas, new int[]{110, 170, 100, 150, 150, 110, 90, 110});
       this.tabelaLinhas.setRowSorter(this.sorterLinhas);
       this.subTabs.addTab("Erros", new JScrollPane(this.tabelaErros));
@@ -149,7 +150,7 @@ public class PainelRelatorio extends JPanel implements Tema.TemaOuvinte {
          Vector var4 = new Vector();
          var4.add("Fatura");
          var4.add(var8.clienteId);
-         var4.add(var8.erro);
+         var4.add(var8.erro != null && !var8.erro.isBlank() ? var8.erro : "(erro sem mensagem gravada — execução antiga; volta a faturar para registar o motivo)");
          this.modeloErros.addRow(var4);
       }
 
@@ -157,7 +158,7 @@ public class PainelRelatorio extends JPanel implements Tema.TemaOuvinte {
          Vector var9 = new Vector();
          var9.add("Nota Créd.");
          var9.add(var13.clienteId);
-         var9.add(var13.erro);
+         var9.add(var13.erro != null && !var13.erro.isBlank() ? var13.erro : "(erro sem mensagem gravada — execução antiga; volta a faturar para registar o motivo)");
          this.modeloErros.addRow(var9);
       }
 

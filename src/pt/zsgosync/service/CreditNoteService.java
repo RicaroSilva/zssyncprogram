@@ -12,6 +12,7 @@ import pt.zsgosync.db.CreditNoteSourceDao;
 import pt.zsgosync.db.CreditNoteSyncDao;
 import pt.zsgosync.model.ChargebackLine;
 import pt.zsgosync.progress.ProgressListener;
+import pt.zsgosync.util.Erros;
 import pt.zsgosync.zsgo.ZsgoApiClient;
 
 public class CreditNoteService {
@@ -82,15 +83,15 @@ public class CreditNoteService {
 
                   var25++;
                } catch (Exception var23) {
-                  Exception var28 = var23;
+                  String var28 = "[ZSGO: criar nota de crédito] " + Erros.descrever(var23);
 
                   for (ChargebackLine var33 : var17) {
-                     this.syncDao.marcarErro(var1, var33.chargebackId, var33.transacaoOriginalId, var15, var2, var3, var28.getMessage());
+                     this.syncDao.marcarErro(var1, var33.chargebackId, var33.transacaoOriginalId, var15, var2, var3, var28);
                   }
 
                   var10++;
-                  var4.aoItemFalhar(var15, var28.getMessage());
-                  LOG.severe("Falha ao emitir NC para cliente " + var15 + ": " + var28.getMessage());
+                  var4.aoItemFalhar(var15, var28);
+                  LOG.severe("Falha ao emitir NC para cliente " + var15 + ": " + var28);
                }
 
                var4.aoProgredir(var11, var24);

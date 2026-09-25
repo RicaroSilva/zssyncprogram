@@ -23,6 +23,7 @@ import pt.zsgosync.db.InvoiceLineDetailDao;
 import pt.zsgosync.db.InvoiceSyncDao;
 import pt.zsgosync.model.BillingLine;
 import pt.zsgosync.progress.ProgressListener;
+import pt.zsgosync.util.Erros;
 import pt.zsgosync.zsgo.ZsgoApiClient;
 
 public class MonthlyInvoiceService {
@@ -172,6 +173,10 @@ public class MonthlyInvoiceService {
       long var21 = 0L;
       long var23 = 0L;
       String var25 = "ok";
+      // Passo em curso — vai no início da mensagem de erro para se saber
+      // exatamente onde falhou (ZSGO, Cyclos ou base de dados).
+      String etapa = "BD: ler estado da fatura";
+      String notaErro = "";
 
       try (Connection var64 = DriverManager.getConnection(this.dbUrl, this.dbUser, this.dbPassword)) {
          long var30 = System.nanoTime();
@@ -197,12 +202,15 @@ public class MonthlyInvoiceService {
             if (var67 == null) {
                String var36 = this.buildSalePayload(var33, var3, var4, var5);
                BigDecimal var37 = somaLinhas(var3);
+               etapa = "ZSGO: criar fatura";
                long var65 = System.nanoTime();
                ZsgoApiClient.SaleResult var38 = this.zsgoApi.createSale(var36);
                var19 = (System.nanoTime() - var65) / 1000000L;
                var9.addAndGet(var19);
                var67 = var38.id;
                var29 = var38.pdfUrl;
+               etapa = "BD: gravar fatura criada";
+               notaErro = " (A fatura já foi criada no ZSGO, id=" + var67 + ".)";
                long var39 = System.nanoTime();
                this.invoiceDao.marcarFaturaCriada(var64, var1, var2, var4, var5, var67, var37);
                if (var29 != null) {
@@ -219,13 +227,17 @@ public class MonthlyInvoiceService {
             }
 
             if (var29 == null) {
-               throw new IllegalStateException("Fatura criada (id=" + var67 + ") mas sem pdf_url disponível.");
+               etapa = "ZSGO: obter PDF";
+               throw new IllegalStateException("Fatura criada (id=" + var67 + ") mas o ZSGO não devolveu pdf_url.");
             }
 
+            etapa = "Cyclos: enviar PDF";
+            notaErro = " (A fatura já existe no ZSGO, id=" + var67 + " — na próxima execução só se repete o envio ao Cyclos.)";
             long var68 = System.nanoTime();
             this.cyclosClient.notificarFatura(var1, var29);
             var21 = (System.nanoTime() - var68) / 1000000L;
             var10.addAndGet(var21);
+            etapa = "BD: marcar como sincronizada";
             long var66 = System.nanoTime();
             this.invoiceDao.marcarSincronizado(var64, var1, var2, var4, var5);
             var11.addAndGet(var23 += (System.nanoTime() - var66) / 1000000L);
@@ -239,18 +251,18 @@ public class MonthlyInvoiceService {
          var25 = "erro(sem-zsgo-code)";
          var15.aoItemFalhar(var16, var34);
       } catch (Exception var62) {
-         Exception var26 = var62;
+         String var26 = "[" + etapa + "] " + Erros.descrever(var62) + notaErro;
 
          try (Connection var27 = DriverManager.getConnection(this.dbUrl, this.dbUser, this.dbPassword)) {
-            this.invoiceDao.marcarErro(var27, var1, var2, var4, var5, var26.getMessage());
+            this.invoiceDao.marcarErro(var27, var1, var2, var4, var5, var26);
          } catch (SQLException var60) {
-            LOG.severe("Falha adicional ao gravar erro da fatura " + var16 + ": " + var60.getMessage());
+            LOG.severe("Falha adicional ao gravar erro da fatura " + var16 + ": " + Erros.descrever(var60));
          }
 
          var8.incrementAndGet();
-         var25 = "erro: " + var62.getMessage();
-         var15.aoItemFalhar(var16, var62.getMessage());
-         LOG.severe("Falha ao faturar " + var16 + ": " + var62.getMessage());
+         var25 = "erro: " + var26;
+         var15.aoItemFalhar(var16, var26);
+         LOG.severe("Falha ao faturar " + var16 + ": " + var26);
          return;
       } finally {
          long var45 = (System.nanoTime() - var17) / 1000000L;

@@ -9,6 +9,7 @@ import pt.zsgosync.db.ClientSourceDao;
 import pt.zsgosync.db.SyncControlDao;
 import pt.zsgosync.model.SourceClient;
 import pt.zsgosync.progress.ProgressListener;
+import pt.zsgosync.util.Erros;
 import pt.zsgosync.zsgo.ZsgoApiClient;
 
 public class ClientSyncService {
@@ -41,7 +42,7 @@ public class ClientSyncService {
             var4++;
             LOG.info(() -> "Cliente " + var8.id + " sincronizado (zsgo_code=" + var9.code + ").");
          } catch (Exception var13) {
-            String var10 = var13.getMessage() + " | Dados enviados: " + var8;
+            String var10 = Erros.descrever(var13) + " | Dados enviados: " + var8;
 
             try {
                this.controlDao.markError(var1, var8.id, var10);

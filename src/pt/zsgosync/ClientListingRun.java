@@ -12,6 +12,7 @@ import pt.zsgosync.db.SyncControlDao;
 import pt.zsgosync.model.SourceClient;
 import pt.zsgosync.progress.StatusListener;
 import pt.zsgosync.service.ClientVerifyService;
+import pt.zsgosync.util.Erros;
 import pt.zsgosync.zsgo.ZsgoApiClient;
 
 public class ClientListingRun {
@@ -90,7 +91,7 @@ public class ClientListingRun {
                var4.markSuccess(var8, var11.sourceId, var13.code, var13.respostaJson, var11.dadosAtuais.contentHash);
                var5++;
             } catch (Exception var15) {
-               var4.markUpdateError(var8, var11.sourceId, "Falha ao ATUALIZAR no ZSGO: " + var15.getMessage());
+               var4.markUpdateError(var8, var11.sourceId, "Falha ao ATUALIZAR no ZSGO: " + Erros.descrever(var15));
                var6++;
             }
 
@@ -147,7 +148,7 @@ public class ClientListingRun {
                   var7.markSuccess(var10, var16.id, var18.code, var18.respostaJson, var16.contentHash);
                   var8++;
                } catch (Exception var20) {
-                  var7.markError(var10, var16.id, "Falha ao criar no ZSGO (a partir do resumo de faturação): " + var20.getMessage());
+                  var7.markError(var10, var16.id, "Falha ao criar no ZSGO (a partir do resumo de faturação): " + Erros.descrever(var20));
                   var9++;
                }
 
