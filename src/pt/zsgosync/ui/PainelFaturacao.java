@@ -322,6 +322,62 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
       this.recarregar(" ");
    }
 
+   // ------------------------------------------------------------ atualização ao vivo
+
+   /** Enquanto a faturação corre, a lista volta a ser lida da BD de poucos em poucos segundos. */
+   private final javax.swing.Timer timerAoVivo = new javax.swing.Timer(3000, e -> this.atualizarSilencioso());
+   private volatile boolean aCarregarSilencioso = false;
+
+   public void iniciarAtualizacaoAoVivo() {
+      SwingUtilities.invokeLater(() -> {
+         this.timerAoVivo.setInitialDelay(1500);
+         this.timerAoVivo.restart();
+      });
+   }
+
+   public void pararAtualizacaoAoVivo() {
+      SwingUtilities.invokeLater(this.timerAoVivo::stop);
+   }
+
+   /** Relê as faturas sem mexer na linha de estado/progresso nem na posição da lista. */
+   private void atualizarSilencioso() {
+      YearMonth ym = this.getMesSelecionado();
+      if (ym == null || this.aCarregarSilencioso) {
+         return;
+      }
+      this.aCarregarSilencioso = true;
+      new Thread(() -> {
+         try {
+            RelatorioService.Relatorio r = RelatorioRun.obter(this.config.get(), ym.getYear(), ym.getMonthValue());
+            SwingUtilities.invokeLater(() -> {
+               if (ym.equals(this.getMesSelecionado())) {
+                  this.mostrarMantendoPosicao(r);
+               }
+            });
+         } catch (Exception e) {
+            // Falha pontual a meio da faturação: tenta outra vez no próximo ciclo.
+         } finally {
+            this.aCarregarSilencioso = false;
+         }
+      }, "faturacao-ao-vivo").start();
+   }
+
+   private void mostrarMantendoPosicao(RelatorioService.Relatorio r) {
+      java.awt.Rectangle vista = this.tabelaFaturas.getVisibleRect();
+      int sel = this.tabelaFaturas.getSelectedRow();
+      String clienteSel = sel >= 0 ? this.linhasFaturas.get(this.tabelaFaturas.convertRowIndexToModel(sel)).clienteId : null;
+      this.mostrar(r);
+      this.tabelaFaturas.scrollRectToVisible(vista);
+      if (clienteSel != null) {
+         for (int i = 0; i < this.tabelaFaturas.getRowCount(); i++) {
+            if (clienteSel.equals(this.linhasFaturas.get(this.tabelaFaturas.convertRowIndexToModel(i)).clienteId)) {
+               this.tabelaFaturas.setRowSelectionInterval(i, i);
+               break;
+            }
+         }
+      }
+   }
+
    /** Recarrega sem apagar a mensagem atual (ex.: o resumo da faturação que acabou de correr). */
    public void recarregarMantendoEstado() {
       this.recarregar(this.labelEstado.getText());

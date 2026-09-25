@@ -448,9 +448,11 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
          () -> {
             ProgressListener var5 = this.painelFaturacao.criarListener("Faturas");
             ProgressListener var6 = this.painelFaturacao.criarListener("Notas de crédito");
+            this.painelFaturacao.iniciarAtualizacaoAoVivo();
             try {
                MonthlyInvoiceRun.run(var1, var2, var3, var5, var6);
             } finally {
+               this.painelFaturacao.pararAtualizacaoAoVivo();
                SwingUtilities.invokeLater(() -> this.painelFaturacao.recarregarMantendoEstado());
             }
             HistoricoRun.registar(
