@@ -178,6 +178,28 @@ public class ZsgoApiClient {
       }
    }
 
+   /** Lê uma fatura/nota de crédito tal como está no ZSGO (GET /sales/{id}). */
+   public ZsgoDocumento getSale(String id) throws ZsgoApiException {
+      HttpRequest pedido = HttpRequest.newBuilder()
+         .uri(URI.create(this.baseUrl + "/sales/" + id))
+         .timeout(Duration.ofSeconds(20L))
+         .header("Authorization", "Bearer " + this.token)
+         .header("Accept", "application/json")
+         .GET()
+         .build();
+      HttpResponse<String> resposta = this.sendComRetry429(pedido);
+      int codigo = resposta.statusCode();
+      if (codigo != 200) {
+         String msg = unescapeJson(firstMatch(MESSAGE_PATTERN, resposta.body()));
+         throw new ZsgoApiException("GET /sales/" + id + " devolveu " + codigo + ": " + (msg != null ? msg : resposta.body()), codigo);
+      }
+      try {
+         return ZsgoDocumento.ler(resposta.body());
+      } catch (IllegalArgumentException e) {
+         throw new ZsgoApiException("Resposta do ZSGO em formato inesperado (" + e.getMessage() + "): " + resposta.body(), codigo);
+      }
+   }
+
    private HttpResponse<String> sendComRetry429(HttpRequest var1) throws ZsgoApiException {
       int var2 = 0;
       int var3 = 1;

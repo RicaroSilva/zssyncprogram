@@ -16,6 +16,15 @@ public class InvoiceSyncDao {
       try (Statement var3 = var1.createStatement()) {
          var3.execute(var2);
          var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS valor_total NUMERIC");
+         // Conferência com o ZSGO: o que o ZSGO tem mesmo para esta fatura.
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_numero VARCHAR(64)");
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_total NUMERIC");
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_liquido NUMERIC");
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_iva NUMERIC");
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_estado VARCHAR(40)");
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_anulado BOOLEAN");
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_conferido_em TIMESTAMP");
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_erro_conferencia TEXT");
       }
    }
 
@@ -149,6 +158,8 @@ public class InvoiceSyncDao {
       String var5 = """
          SELECT f.user_id, f.origem_id, f.status, f.zsgo_sale_id, f.valor_total, f.pdf_url,
                 f.tentativas, f.ultimo_erro, f.atualizado_em,
+                f.zsgo_numero, f.zsgo_total, f.zsgo_liquido, f.zsgo_iva, f.zsgo_estado, f.zsgo_anulado,
+                f.zsgo_conferido_em, f.zsgo_erro_conferencia,
                 s.zsgo_code,
                 s.zsgo_dados->'data'->'identity'->>'name' AS nome,
                 s.zsgo_dados->'data'->'identity'->>'tax_id' AS nif,
@@ -200,12 +211,49 @@ public class InvoiceSyncDao {
                var8.nTransacoes = var7.getLong("n_transacoes");
                var8.somaLinhas = var7.getBigDecimal("soma_linhas");
                var8.rubricas = var7.getString("rubricas");
+               var8.zsgoNumero = var7.getString("zsgo_numero");
+               var8.zsgoTotal = var7.getBigDecimal("zsgo_total");
+               var8.zsgoLiquido = var7.getBigDecimal("zsgo_liquido");
+               var8.zsgoIva = var7.getBigDecimal("zsgo_iva");
+               var8.zsgoEstado = var7.getString("zsgo_estado");
+               var8.zsgoAnulado = var7.getBoolean("zsgo_anulado");
+               var8.zsgoConferidoEm = var7.getTimestamp("zsgo_conferido_em");
+               var8.zsgoErroConferencia = var7.getString("zsgo_erro_conferencia");
                var4.add(var8);
             }
          }
       }
 
       return var4;
+   }
+
+   /** Grava o que o ZSGO devolveu para esta fatura (ou o erro, se não foi possível ler). */
+   public void gravarConferencia(Connection c, String cliente, String origem, int ano, int mes, pt.zsgosync.zsgo.ZsgoDocumento d, String erro)
+      throws SQLException {
+      String sql = """
+         UPDATE zsgo_invoice_sync SET
+             zsgo_numero = COALESCE(?, zsgo_numero), zsgo_total = ?, zsgo_liquido = ?, zsgo_iva = ?,
+             zsgo_estado = ?, zsgo_anulado = ?, zsgo_conferido_em = now(), zsgo_erro_conferencia = ?
+         WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?
+         """;
+      try (PreparedStatement ps = c.prepareStatement(sql)) {
+         ps.setString(1, d != null ? d.numero : null);
+         ps.setBigDecimal(2, d != null ? d.total : null);
+         ps.setBigDecimal(3, d != null ? d.liquido : null);
+         ps.setBigDecimal(4, d != null ? d.iva : null);
+         ps.setString(5, d != null ? d.estado : null);
+         if (d != null) {
+            ps.setBoolean(6, d.anulado);
+         } else {
+            ps.setNull(6, java.sql.Types.BOOLEAN);
+         }
+         ps.setString(7, erro);
+         ps.setLong(8, paraLong(cliente));
+         ps.setLong(9, paraLong(origem));
+         ps.setInt(10, ano);
+         ps.setInt(11, mes);
+         ps.executeUpdate();
+      }
    }
 
    private static long paraLong(String var0) {
@@ -241,6 +289,25 @@ public class InvoiceSyncDao {
       public long nTransacoes;
       public BigDecimal somaLinhas;
       public String rubricas;
+
+      public String zsgoNumero;
+      public BigDecimal zsgoTotal;
+      public BigDecimal zsgoLiquido;
+      public BigDecimal zsgoIva;
+      public String zsgoEstado;
+      public boolean zsgoAnulado;
+      public java.sql.Timestamp zsgoConferidoEm;
+      public String zsgoErroConferencia;
+
+      /** Diferença entre o que o ZSGO tem e o que o programa enviou (null se não conferida). */
+      public BigDecimal diferenca() {
+         return this.zsgoTotal != null && this.valorTotal != null ? this.zsgoTotal.subtract(this.valorTotal) : null;
+      }
+
+      public boolean temDiferenca() {
+         BigDecimal d = this.diferenca();
+         return this.zsgoAnulado || d != null && d.abs().compareTo(new BigDecimal("0.01")) >= 0;
+      }
 
       public boolean isRedirecionada() {
          return this.origemId != null && !this.origemId.equals(this.clienteId);

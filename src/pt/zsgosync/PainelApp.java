@@ -31,7 +31,9 @@ import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JProgressBar;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
@@ -51,9 +53,9 @@ import pt.zsgosync.service.RelatorioService;
 import pt.zsgosync.ui.PainelClientes;
 import pt.zsgosync.ui.PainelDescobrirLimite;
 import pt.zsgosync.ui.PainelExecucao;
+import pt.zsgosync.ui.PainelFaturacao;
 import pt.zsgosync.ui.PainelHistorico;
 import pt.zsgosync.ui.PainelLogin;
-import pt.zsgosync.ui.PainelRelatorio;
 import pt.zsgosync.ui.PainelResumo;
 import pt.zsgosync.ui.PainelSidebar;
 import pt.zsgosync.ui.PainelUtilizadores;
@@ -61,16 +63,12 @@ import pt.zsgosync.ui.Tema;
 
 public class PainelApp extends JFrame implements Tema.TemaOuvinte {
    private final JButton btnSincronizar = this.criarBotaoDourado("Sincronizar clientes agora");
-   private final JTextField campoAno = this.criarCampoTexto(String.valueOf(mesAnteriorPadrao().getYear()));
-   private final JTextField campoMes = this.criarCampoTexto(String.valueOf(mesAnteriorPadrao().getMonthValue()));
-   private final JButton btnFaturar = this.criarBotaoDourado("Gerar faturas do mês");
+   private final JButton btnFaturar = this.criarBotaoDourado("Gerar faturas em falta");
+   private final JButton btnFerramentas = new JButton("Ferramentas ▾");
    private final JButton btnTema = new JButton();
    private final JButton btnTestarLigacao = new JButton("Testar ligação");
    private final JButton btnDescobrirLimite = new JButton("Descobrir limite");
    private final PainelExecucao painelClientes = new PainelExecucao();
-   private final PainelExecucao painelFaturas = new PainelExecucao();
-   private final PainelExecucao painelNotasCredito = new PainelExecucao();
-   private final PainelRelatorio painelRelatorio = new PainelRelatorio();
    private final PainelClientes painelClientesLista = new PainelClientes();
    private final JButton btnAtualizarClientes = this.criarBotaoDourado("Atualizar lista");
    private final JButton btnVerificarAlteracoes = this.criarBotaoDourado("Verificar alterações (todos)");
@@ -78,9 +76,6 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
    private final JProgressBar progressoVerificacao = new JProgressBar();
    private final JLabel labelEstadoFaturacao = new JLabel(" ");
    private final JProgressBar progressoFaturacao = new JProgressBar();
-   private final JTextField campoAnoRelatorio = this.criarCampoTexto(String.valueOf(mesAnteriorPadrao().getYear()));
-   private final JTextField campoMesRelatorio = this.criarCampoTexto(String.valueOf(mesAnteriorPadrao().getMonthValue()));
-   private final JButton btnConsultarRelatorio = this.criarBotaoDourado("Consultar");
    private final AppConfig appConfigInicial;
    private final AppUserDao.Usuario usuarioAtual;
    private final JLabel labelSessao = new JLabel(" ");
@@ -104,16 +99,10 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
    private final JPanel conteudo = new JPanel(this.cardLayout);
    private JPanel abaClientes;
    private JPanel abaFaturacao;
-   private JPanel abaRelatorio;
+   private PainelFaturacao painelFaturacao;
    private JPanel abaListaClientes;
    private JPanel wrapperClientes;
-   private JPanel wrapperFaturas;
-   private JPanel wrapperNotasCredito;
    private JLabel infoClientes;
-   private JLabel lblAno;
-   private JLabel lblMes;
-   private JLabel lblAnoRelatorio;
-   private JLabel lblMesRelatorio;
 
    private static YearMonth mesAnteriorPadrao() {
       return YearMonth.now().minusMonths(1L);
@@ -131,28 +120,31 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
             System.exit(0);
          }
       });
-      this.setSize(1080, 720);
+      this.setSize(1280, 800);
+      this.setMinimumSize(new Dimension(1100, 700));
       this.setLocationRelativeTo(null);
+      // As tabelas de faturação têm muitas colunas: abre a ocupar o ecrã todo.
+      this.setExtendedState(JFrame.MAXIMIZED_BOTH);
       this.setLayout(new BorderLayout());
       this.header = this.montarCabecalho();
       this.add(this.header, "North");
       this.abaResumo = this.painelResumo;
       this.abaClientes = this.montarAbaClientes();
       this.abaFaturacao = this.montarAbaFaturacao();
-      this.abaRelatorio = this.montarAbaRelatorio();
       this.abaListaClientes = this.montarAbaListaClientes();
       this.abaHistorico = this.montarAbaHistorico();
       this.conteudo.setOpaque(false);
       this.conteudo.add(this.abaResumo, "resumo");
       this.conteudo.add(this.abaClientes, "sincronizar");
       this.conteudo.add(this.abaFaturacao, "faturacao");
-      this.conteudo.add(this.abaRelatorio, "relatorio");
       this.conteudo.add(this.abaListaClientes, "clientes");
       this.conteudo.add(this.abaHistorico, "historico");
       this.sidebar.aoSelecionar(var1x -> {
          this.cardLayout.show(this.conteudo, var1x);
          if ("resumo".equals(var1x)) {
             this.carregarResumo();
+         } else if ("faturacao".equals(var1x)) {
+            this.painelFaturacao.recarregar();
          }
       });
       this.corpo = new JPanel(new BorderLayout());
@@ -174,8 +166,7 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       ArrayList var1 = new ArrayList();
       var1.add(new PainelSidebar.Item("resumo", "resumo", "Resumo"));
       var1.add(new PainelSidebar.Item("sincronizar", "sincronizar", "Sincronizar Clientes"));
-      var1.add(new PainelSidebar.Item("faturacao", "faturacao", "Faturação Mensal"));
-      var1.add(new PainelSidebar.Item("relatorio", "relatorio", "Relatório"));
+      var1.add(new PainelSidebar.Item("faturacao", "faturacao", "Faturação"));
       var1.add(new PainelSidebar.Item("clientes", "clientes", "Clientes"));
       var1.add(new PainelSidebar.Item("historico", "historico", "Histórico"));
       return new PainelSidebar(var1);
@@ -211,29 +202,31 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       this.labelSessao.setFont(Tema.FONT_BASE.deriveFont(12.0F));
       this.labelSessao.setText("Sessão: " + this.usuarioAtual.username + " (" + this.usuarioAtual.role + ")");
       var6.add(this.labelSessao);
+      JPopupMenu var7 = new JPopupMenu();
       if (this.usuarioAtual.isAdmin()) {
-         this.btnGerirUtilizadores.setFocusPainted(false);
-         this.btnGerirUtilizadores.setCursor(Cursor.getPredefinedCursor(12));
-         this.btnGerirUtilizadores.addActionListener(var1x -> this.abrirGerirUtilizadores());
-         var6.add(this.btnGerirUtilizadores);
+         JMenuItem var8 = new JMenuItem("Gerir utilizadores");
+         var8.addActionListener(var1x -> this.abrirGerirUtilizadores());
+         var7.add(var8);
       }
 
-      this.btnSair.setFocusPainted(false);
-      this.btnSair.setCursor(Cursor.getPredefinedCursor(12));
-      this.btnSair.addActionListener(var1x -> this.terminarSessao());
-      var6.add(this.btnSair);
-      this.btnTestarLigacao.setFocusPainted(false);
-      this.btnTestarLigacao.setCursor(Cursor.getPredefinedCursor(12));
-      this.btnTestarLigacao.addActionListener(var1x -> this.testarLigacao());
-      var6.add(this.btnTestarLigacao);
-      this.btnDescobrirLimite.setFocusPainted(false);
-      this.btnDescobrirLimite.setCursor(Cursor.getPredefinedCursor(12));
-      this.btnDescobrirLimite.addActionListener(var1x -> this.abrirDescobrirLimite());
-      var6.add(this.btnDescobrirLimite);
+      JMenuItem var9 = new JMenuItem("Testar ligação (base de dados e ZSGO)");
+      var9.addActionListener(var1x -> this.testarLigacao());
+      var7.add(var9);
+      JMenuItem var10 = new JMenuItem("Descobrir limite de pedidos do ZSGO");
+      var10.addActionListener(var1x -> this.abrirDescobrirLimite());
+      var7.add(var10);
+      this.btnFerramentas.setFocusPainted(false);
+      this.btnFerramentas.setCursor(Cursor.getPredefinedCursor(12));
+      this.btnFerramentas.addActionListener(var1x -> var7.show(this.btnFerramentas, 0, this.btnFerramentas.getHeight()));
+      var6.add(this.btnFerramentas);
       this.btnTema.setFocusPainted(false);
       this.btnTema.setCursor(Cursor.getPredefinedCursor(12));
       this.btnTema.addActionListener(var0 -> Tema.alternar());
       var6.add(this.btnTema);
+      this.btnSair.setFocusPainted(false);
+      this.btnSair.setCursor(Cursor.getPredefinedCursor(12));
+      this.btnSair.addActionListener(var1x -> this.terminarSessao());
+      var6.add(this.btnSair);
       var2.add(var6, "East");
       return var2;
    }
@@ -256,7 +249,7 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
 
    private void testarLigacao() {
       this.correrEmBackground(
-         this.btnTestarLigacao,
+         this.btnFerramentas,
          () -> {
             AppConfig var1 = new AppConfig("config.properties");
             ConnectionTestRun.Resultado var2 = ConnectionTestRun.testar(var1);
@@ -341,63 +334,19 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
    }
 
    private JPanel montarAbaFaturacao() {
-      JPanel var1 = new JPanel(new BorderLayout(10, 12));
-      var1.setBorder(new EmptyBorder(18, 4, 4, 4));
-      JPanel var2 = new JPanel();
-      var2.setLayout(new BoxLayout(var2, 1));
-      var2.setOpaque(false);
-      JPanel var3 = new JPanel(new FlowLayout(0, 0, 10));
-      var3.setOpaque(false);
-      this.lblAno = new JLabel("Ano");
-      this.lblAno.setFont(Tema.FONT_BASE);
-      this.lblMes = new JLabel("Mês (1-12)");
-      this.lblMes.setFont(Tema.FONT_BASE);
-      var3.add(this.envolverComRotulo(this.lblAno, this.campoAno));
-      var3.add(Box.createHorizontalStrut(14));
-      var3.add(this.envolverComRotulo(this.lblMes, this.campoMes));
-      var3.add(Box.createHorizontalStrut(20));
-      var3.add(this.btnFaturar);
-      var3.setAlignmentX(0.0F);
-      var2.add(var3);
-      var2.add(Box.createVerticalStrut(8));
-      this.labelEstadoFaturacao.setFont(Tema.FONT_BASE.deriveFont(12.0F));
-      this.labelEstadoFaturacao.setAlignmentX(0.0F);
-      this.progressoFaturacao.setAlignmentX(0.0F);
-      this.progressoFaturacao.setPreferredSize(new Dimension(360, 16));
-      this.progressoFaturacao.setMaximumSize(new Dimension(360, 16));
-      this.progressoFaturacao.setStringPainted(true);
-      var2.add(this.labelEstadoFaturacao);
-      var2.add(Box.createVerticalStrut(4));
-      var2.add(this.progressoFaturacao);
-      var1.add(var2, "North");
-      JPanel var4 = new JPanel(new GridLayout(1, 2, 16, 0));
-      var4.setOpaque(false);
-      this.wrapperFaturas = new JPanel(new BorderLayout());
-      this.wrapperFaturas.setOpaque(false);
-      this.wrapperFaturas.add(this.painelFaturas, "Center");
-      this.wrapperNotasCredito = new JPanel(new BorderLayout());
-      this.wrapperNotasCredito.setOpaque(false);
-      this.wrapperNotasCredito.add(this.painelNotasCredito, "Center");
-      var4.add(this.wrapperFaturas);
-      var4.add(this.wrapperNotasCredito);
-      var1.add(var4, "Center");
-      this.btnFaturar.addActionListener(var1x -> {
-         int var2x;
-         int var3x;
+      this.painelFaturacao = new PainelFaturacao(() -> {
          try {
-            var3x = Integer.parseInt(this.campoAno.getText().trim());
-            var2x = Integer.parseInt(this.campoMes.getText().trim());
-            if (var2x < 1 || var2x > 12) {
-               throw new NumberFormatException("mês fora do intervalo 1-12");
-            }
-         } catch (NumberFormatException var5) {
-            JOptionPane.showMessageDialog(this, "Ano/Mês inválidos. Usa números — ex: Ano 2026, Mês 9.", "Valores inválidos", 0);
-            return;
+            return new AppConfig("config.properties");
+         } catch (java.io.IOException var1x) {
+            throw new java.io.UncheckedIOException("Não foi possível ler o config.properties", var1x);
          }
-
-         this.iniciarFaturacaoComResumo(var3x, var2x);
+      }, this.btnFaturar, this.labelEstadoFaturacao, this.progressoFaturacao);
+      this.btnFaturar.setToolTipText("Cria no ZSGO as faturas e notas de crédito do mês que ainda não foram feitas (as já feitas são ignoradas).");
+      this.btnFaturar.addActionListener(var1x -> {
+         YearMonth var2x = this.painelFaturacao.getMesSelecionado();
+         this.iniciarFaturacaoComResumo(var2x.getYear(), var2x.getMonthValue());
       });
-      return var1;
+      return this.painelFaturacao;
    }
 
    private void iniciarFaturacaoComResumo(int var1, int var2) {
@@ -438,18 +387,7 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
    }
 
    private StatusListener criarStatusListenerFaturacao() {
-      return (var1, var2, var3) -> SwingUtilities.invokeLater(() -> {
-         this.labelEstadoFaturacao.setText(var1);
-         if (var3 < 0) {
-            this.progressoFaturacao.setIndeterminate(true);
-            this.progressoFaturacao.setStringPainted(false);
-         } else {
-            this.progressoFaturacao.setIndeterminate(false);
-            this.progressoFaturacao.setStringPainted(true);
-            this.progressoFaturacao.setMaximum(Math.max(var3, 1));
-            this.progressoFaturacao.setValue(var2);
-         }
-      });
+      return (var1, var2, var3) -> SwingUtilities.invokeLater(() -> this.painelFaturacao.mostrarEstado(var1, var2, var3));
    }
 
    private void oferecerSincronizarSemZsgoCode(AppConfig var1, int var2, int var3, FaturacaoPreviewService.Preview var4) {
@@ -508,11 +446,13 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       this.correrEmBackground(
          this.btnFaturar,
          () -> {
-            this.painelFaturas.limparErros();
-            this.painelNotasCredito.limparErros();
-            ProgressListener var5 = this.painelFaturas.criarListener("Faturas");
-            ProgressListener var6 = this.painelNotasCredito.criarListener("Notas de Crédito");
-            MonthlyInvoiceRun.run(var1, var2, var3, var5, var6);
+            ProgressListener var5 = this.painelFaturacao.criarListener("Faturas");
+            ProgressListener var6 = this.painelFaturacao.criarListener("Notas de crédito");
+            try {
+               MonthlyInvoiceRun.run(var1, var2, var3, var5, var6);
+            } finally {
+               SwingUtilities.invokeLater(() -> this.painelFaturacao.recarregarMantendoEstado());
+            }
             HistoricoRun.registar(
                var1,
                this.usuarioAtual.username,
@@ -578,45 +518,6 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       var5.append("\nDeseja continuar com a faturação mensal de ").append(var2).append("/").append(var1).append("?");
       int var6 = JOptionPane.showConfirmDialog(this, var5.toString(), "Confirmar faturação mensal", 0, 3);
       return var6 == 0;
-   }
-
-   private JPanel montarAbaRelatorio() {
-      JPanel var1 = new JPanel(new BorderLayout(10, 12));
-      var1.setBorder(new EmptyBorder(18, 4, 4, 4));
-      JPanel var2 = new JPanel(new FlowLayout(0, 0, 10));
-      var2.setOpaque(false);
-      this.lblAnoRelatorio = new JLabel("Ano");
-      this.lblAnoRelatorio.setFont(Tema.FONT_BASE);
-      this.lblMesRelatorio = new JLabel("Mês (1-12)");
-      this.lblMesRelatorio.setFont(Tema.FONT_BASE);
-      var2.add(this.envolverComRotulo(this.lblAnoRelatorio, this.campoAnoRelatorio));
-      var2.add(Box.createHorizontalStrut(14));
-      var2.add(this.envolverComRotulo(this.lblMesRelatorio, this.campoMesRelatorio));
-      var2.add(Box.createHorizontalStrut(20));
-      var2.add(this.btnConsultarRelatorio);
-      var1.add(var2, "North");
-      var1.add(this.painelRelatorio, "Center");
-      this.btnConsultarRelatorio.addActionListener(var1x -> {
-         int var2x;
-         int var3;
-         try {
-            var3 = Integer.parseInt(this.campoAnoRelatorio.getText().trim());
-            var2x = Integer.parseInt(this.campoMesRelatorio.getText().trim());
-            if (var2x < 1 || var2x > 12) {
-               throw new NumberFormatException("mês fora do intervalo 1-12");
-            }
-         } catch (NumberFormatException var5) {
-            JOptionPane.showMessageDialog(this, "Ano/Mês inválidos. Usa números — ex: Ano 2026, Mês 9.", "Valores inválidos", 0);
-            return;
-         }
-
-         this.correrEmBackground(this.btnConsultarRelatorio, () -> {
-            AppConfig var3x = new AppConfig("config.properties");
-            RelatorioService.Relatorio var4 = RelatorioRun.obter(var3x, var3, var2x);
-            SwingUtilities.invokeLater(() -> this.painelRelatorio.mostrar(var4, var3, var2x));
-         });
-      });
-      return var1;
    }
 
    private JPanel montarAbaListaClientes() {
@@ -823,12 +724,9 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       this.btnTema.setBackground(Tema.SURFACE_2);
       this.btnTema.setForeground(Tema.FOREGROUND);
       this.btnTema.setBorder(BorderFactory.createLineBorder(Tema.BORDER, 1, true));
-      this.btnTestarLigacao.setBackground(Tema.SURFACE_2);
-      this.btnTestarLigacao.setForeground(Tema.FOREGROUND);
-      this.btnTestarLigacao.setBorder(BorderFactory.createLineBorder(Tema.BORDER, 1, true));
-      this.btnDescobrirLimite.setBackground(Tema.SURFACE_2);
-      this.btnDescobrirLimite.setForeground(Tema.FOREGROUND);
-      this.btnDescobrirLimite.setBorder(BorderFactory.createLineBorder(Tema.BORDER, 1, true));
+      this.btnFerramentas.setBackground(Tema.SURFACE_2);
+      this.btnFerramentas.setForeground(Tema.FOREGROUND);
+      this.btnFerramentas.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Tema.BORDER, 1, true), new EmptyBorder(4, 10, 4, 10)));
       this.labelSessao.setForeground(Tema.MUTED_FOREGROUND);
       this.btnSair.setBackground(Tema.SURFACE_2);
       this.btnSair.setForeground(Tema.FOREGROUND);
@@ -847,28 +745,16 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       this.abaResumo.setBackground(Tema.SURFACE);
       this.abaClientes.setBackground(Tema.SURFACE);
       this.abaFaturacao.setBackground(Tema.SURFACE);
-      this.abaRelatorio.setBackground(Tema.SURFACE);
       this.abaListaClientes.setBackground(Tema.SURFACE);
       this.infoClientes.setForeground(Tema.MUTED_FOREGROUND);
       this.labelEstadoVerificacao.setForeground(Tema.MUTED_FOREGROUND);
       this.labelEstadoFaturacao.setForeground(Tema.MUTED_FOREGROUND);
-      this.lblAno.setForeground(Tema.MUTED_FOREGROUND);
-      this.lblMes.setForeground(Tema.MUTED_FOREGROUND);
-      this.lblAnoRelatorio.setForeground(Tema.MUTED_FOREGROUND);
-      this.lblMesRelatorio.setForeground(Tema.MUTED_FOREGROUND);
-      this.estilizarCampo(this.campoAno);
-      this.estilizarCampo(this.campoMes);
-      this.estilizarCampo(this.campoAnoRelatorio);
-      this.estilizarCampo(this.campoMesRelatorio);
       this.btnSincronizar.setForeground(Tema.PRIMARY_FOREGROUND);
       this.btnFaturar.setForeground(Tema.PRIMARY_FOREGROUND);
-      this.btnConsultarRelatorio.setForeground(Tema.PRIMARY_FOREGROUND);
       this.btnAtualizarClientes.setForeground(Tema.PRIMARY_FOREGROUND);
       this.btnVerificarAlteracoes.setForeground(Tema.PRIMARY_FOREGROUND);
       Border var2 = BorderFactory.createLineBorder(Tema.BORDER, 1, true);
       this.wrapperClientes.setBorder(var2);
-      this.aplicarBordaTitulada(this.wrapperFaturas, "1. Faturas");
-      this.aplicarBordaTitulada(this.wrapperNotasCredito, "2. Notas de Crédito (estornos)");
       this.revalidate();
       this.repaint();
    }

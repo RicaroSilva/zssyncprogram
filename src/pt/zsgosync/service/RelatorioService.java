@@ -28,6 +28,7 @@ public class RelatorioService {
       var4.faturas = this.invoiceDao.listarFaturas(var1, var2, var3);
       var4.resumoNotasCredito = this.creditNoteDao.obterResumo(var1, var2, var3);
       var4.errosNotasCredito = this.creditNoteDao.listarErros(var1, var2, var3);
+      var4.notasCredito = this.creditNoteDao.listarTodas(var1, var2, var3);
       var4.linhasPorRubrica = this.lineDetailDao.obterPorMes(var1, var2, var3);
       return var4;
    }
@@ -38,6 +39,7 @@ public class RelatorioService {
       public List<InvoiceSyncDao.FaturaDetalhe> faturas;
       public CreditNoteSyncDao.Resumo resumoNotasCredito;
       public List<CreditNoteSyncDao.LinhaErro> errosNotasCredito;
+      public List<CreditNoteSyncDao.NotaCredito> notasCredito;
       public List<InvoiceLineDetailDao.LinhaDetalhe> linhasPorRubrica;
    }
 }

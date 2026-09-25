@@ -127,6 +127,52 @@ public class CreditNoteSyncDao {
       }
    }
 
+   /** Todas as notas de crédito do mês (qualquer estado), com os ids das transações. */
+   public List<CreditNoteSyncDao.NotaCredito> listarTodas(Connection c, int ano, int mes) throws SQLException {
+      List<CreditNoteSyncDao.NotaCredito> r = new ArrayList<>();
+      String sql = """
+         SELECT n.chargeback_id, n.transacao_original_id, n.cliente_id, n.valor_estorno, n.zsgo_nc_id,
+                n.status, n.tentativas, n.ultimo_erro,
+                s.zsgo_dados->'data'->'identity'->>'name' AS nome
+         FROM zsgo_credit_note_sync n
+         LEFT JOIN zsgo_client_sync s ON s.user_id = n.cliente_id
+         WHERE n.ano = ? AND n.mes = ?
+         ORDER BY n.cliente_id ASC, n.chargeback_id ASC
+         """;
+      try (PreparedStatement ps = c.prepareStatement(sql)) {
+         ps.setInt(1, ano);
+         ps.setInt(2, mes);
+         try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+               CreditNoteSyncDao.NotaCredito n = new CreditNoteSyncDao.NotaCredito();
+               n.chargebackId = rs.getString("chargeback_id");
+               n.transacaoOriginalId = rs.getString("transacao_original_id");
+               n.clienteId = rs.getString("cliente_id");
+               n.nome = rs.getString("nome");
+               n.valorEstorno = rs.getBigDecimal("valor_estorno");
+               n.zsgoNcId = rs.getString("zsgo_nc_id");
+               n.status = rs.getString("status");
+               n.tentativas = rs.getInt("tentativas");
+               n.ultimoErro = rs.getString("ultimo_erro");
+               r.add(n);
+            }
+         }
+      }
+      return r;
+   }
+
+   public static class NotaCredito {
+      public String chargebackId;
+      public String transacaoOriginalId;
+      public String clienteId;
+      public String nome;
+      public BigDecimal valorEstorno;
+      public String zsgoNcId;
+      public String status;
+      public int tentativas;
+      public String ultimoErro;
+   }
+
    public static class Estado {
       public String status;
       public int tentativas;

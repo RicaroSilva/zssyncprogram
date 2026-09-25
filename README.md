@@ -12,6 +12,22 @@ Ambos precisam de `config.properties` na mesma pasta (copiar de
 `config.properties.example` e preencher). Esse ficheiro tem segredos e
 **não** vai para o git.
 
+## Painel
+
+- **Resumo** — números do mês anterior.
+- **Sincronizar Clientes** — cria no ZSGO os clientes novos/pendentes.
+- **Faturação** — escolhe-se o mês e aparece cada fatura desse mês:
+  estado, valor enviado, **valor que está no ZSGO** e diferença.
+  - *Gerar faturas em falta*: cria as faturas/notas de crédito que faltam.
+  - *Conferir com o ZSGO*: lê cada fatura do ZSGO (`GET /sales/{id}`) e
+    grava número, total, líquido, IVA e estado (colunas `zsgo_*` da
+    `zsgo_invoice_sync`). Só lê; não altera nada no ZSGO.
+  - Duplo-clique numa fatura: rubricas enviadas, erro completo e o documento
+    lido do ZSGO (linhas e resposta completa).
+  - *Exportar*: faturas, linhas por rubrica ou notas de crédito em CSV.
+- **Clientes** / **Histórico**.
+- **Ferramentas** (topo): gerir utilizadores, testar ligação, descobrir limite.
+
 ## Estrutura
 
 - `src/pt/zsgosync/` — código-fonte Java.
