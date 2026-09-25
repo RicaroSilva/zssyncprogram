@@ -35,6 +35,8 @@ Ambos precisam de `config.properties` na mesma pasta (copiar de
 - **Histórico**.
 - **Ferramentas** (topo): gerir utilizadores, testar ligação, descobrir limite.
 
+Manual de utilizador: [`docs/manual-painel-zsgo.html`](docs/manual-painel-zsgo.html) (abre no browser).
+
 ## Estrutura
 
 - `src/pt/zsgosync/` — código-fonte Java.
