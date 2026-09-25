@@ -155,7 +155,13 @@ public class ClientListingRun {
                var2.aoAtualizarEstado(++var23 + " / " + var22 + " processado(s)...", var23, var22);
             }
 
-            var2.aoAtualizarEstado("Concluído — " + var8 + " criado(s) no ZSGO, " + var9 + " com erro.", var22, var22);
+            int var24 = var4.size() - var22;
+            var2.aoAtualizarEstado(
+               "Concluído — " + var8 + " criado(s) no ZSGO, " + var9 + " com erro"
+                  + (var24 > 0 ? ", " + var24 + " não encontrado(s) na source.clients.verify.query (não foi possível criá-los)." : "."),
+               var22,
+               var22
+            );
          }
 
          return new int[]{var8, var9};

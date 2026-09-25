@@ -33,7 +33,7 @@ public class FaturacaoPreviewService {
       }
 
       var8.totalClientesElegiveis = var10.size();
-      LinkedHashSet var20 = new LinkedHashSet();
+      LinkedHashSet<String> var20 = new LinkedHashSet<>();
 
       for (List<BillingLine> var23 : var10.values()) {
          BillingLine var14 = (BillingLine)var23.get(0);
@@ -84,6 +84,19 @@ public class FaturacaoPreviewService {
                if (var25.valorEstorno != null) {
                   var8.valorNotasCreditoAEmitir = var8.valorNotasCreditoAEmitir.add(var25.valorEstorno);
                }
+
+               // Clientes que só aparecem nas notas de crédito também precisam
+               // de zsgo_code — entram na mesma lista, para o painel oferecer
+               // criá-los antes de faturar.
+               if (var25.zsgoCode == null || var25.zsgoCode.isBlank()) {
+                  var8.notasCreditoSemZsgoCode++;
+                  if (var25.clienteId != null && var20.add(var25.clienteId)) {
+                     var8.idsSemZsgoCode.add(var25.clienteId);
+                     if (var8.exemplosSemZsgoCode.size() < 10) {
+                        var8.exemplosSemZsgoCode.add(var25.clienteId);
+                     }
+                  }
+               }
             }
          }
       }
@@ -104,6 +117,7 @@ public class FaturacaoPreviewService {
       public int totalNotasCreditoElegiveis;
       public int notasCreditoJaEmitidas;
       public int notasCreditoAEmitir;
+      public int notasCreditoSemZsgoCode;
       public BigDecimal valorNotasCreditoAEmitir = BigDecimal.ZERO;
    }
 }

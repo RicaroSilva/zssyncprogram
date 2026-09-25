@@ -417,7 +417,7 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
                   );
                   SwingUtilities.invokeLater(() -> {
                      this.btnFaturar.setText(var3);
-                     if (var6.clientesSemZsgoCode > 0) {
+                     if (!var6.idsSemZsgoCode.isEmpty()) {
                         this.oferecerSincronizarSemZsgoCode(var5, var1, var2, var6);
                      } else {
                         this.continuarComResumoOuFaturar(var5, var1, var2, var6);
@@ -455,10 +455,10 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
    private void oferecerSincronizarSemZsgoCode(AppConfig var1, int var2, int var3, FaturacaoPreviewService.Preview var4) {
       String[] var5 = new String[]{"Sincronizar agora", "Ignorar por agora", "Cancelar"};
       StringBuilder var6 = new StringBuilder();
-      var6.append(var4.clientesSemZsgoCode).append(" cliente(s) não têm zsgo_code e vão falhar na faturação");
+      var6.append(var4.idsSemZsgoCode.size()).append(" cliente(s) não têm zsgo_code e vão falhar na faturação / notas de crédito");
       if (!var4.exemplosSemZsgoCode.isEmpty()) {
          var6.append(" (ex: ").append(String.join(", ", var4.exemplosSemZsgoCode));
-         if (var4.clientesSemZsgoCode > var4.exemplosSemZsgoCode.size()) {
+         if (var4.idsSemZsgoCode.size() > var4.exemplosSemZsgoCode.size()) {
             var6.append(", ...");
          }
 
@@ -568,6 +568,9 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
          .append(var4.format(var3.valorNotasCreditoAEmitir))
          .append("\n");
       var5.append("  • ").append(var3.notasCreditoJaEmitidas).append(" já estavam emitidas (vão ser ignoradas)\n");
+      if (var3.notasCreditoSemZsgoCode > 0) {
+         var5.append("  • ").append(var3.notasCreditoSemZsgoCode).append(" são de clientes SEM zsgo_code e VÃO FALHAR\n");
+      }
       if (var3.clientesAFaturar == 0 && var3.notasCreditoAEmitir == 0) {
          var5.append("\nNão há nada por faturar/emitir este mês com os dados atuais.\n");
       }
