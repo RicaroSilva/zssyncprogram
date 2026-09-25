@@ -146,6 +146,8 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
             this.carregarResumo();
          } else if ("faturacao".equals(var1x)) {
             this.painelFaturacao.recarregar();
+         } else if ("clientes".equals(var1x) && !this.painelClientesLista.temDados() && this.btnAtualizarClientes.isEnabled()) {
+            this.btnAtualizarClientes.doClick();
          }
       });
       this.corpo = new JPanel(new BorderLayout());
@@ -525,15 +527,18 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
 
    private JPanel montarAbaListaClientes() {
       JPanel var1 = new JPanel(new BorderLayout(10, 12));
-      var1.setBorder(new EmptyBorder(18, 4, 4, 4));
+      var1.setBorder(new EmptyBorder(12, 4, 4, 4));
       JPanel var2 = new JPanel();
       var2.setLayout(new BoxLayout(var2, 1));
       var2.setOpaque(false);
-      JPanel var3 = new JPanel(new FlowLayout(0, 0, 10));
+      JPanel var3 = new JPanel(new FlowLayout(0, 0, 4));
       var3.setOpaque(false);
       var3.add(this.btnAtualizarClientes);
       var3.add(Box.createHorizontalStrut(10));
       var3.add(this.btnVerificarAlteracoes);
+      this.btnAtualizarClientes.setToolTipText("Volta a ler a lista de clientes da base de dados.");
+      this.btnVerificarAlteracoes.setToolTipText("Compara os dados atuais do Cyclos com os enviados ao ZSGO e oferece reenviar os que mudaram.");
+      this.progressoVerificacao.setVisible(false);
       var3.setAlignmentX(0.0F);
       var2.add(var3);
       var2.add(Box.createVerticalStrut(8));
@@ -592,6 +597,7 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
    private StatusListener criarStatusListenerVerificacao() {
       return (var1, var2, var3) -> SwingUtilities.invokeLater(() -> {
          this.labelEstadoVerificacao.setText(var1);
+         this.progressoVerificacao.setVisible(true);
          if (var3 < 0) {
             this.progressoVerificacao.setIndeterminate(true);
             this.progressoVerificacao.setStringPainted(false);

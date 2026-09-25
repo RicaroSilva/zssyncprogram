@@ -11,7 +11,23 @@ import java.util.List;
 public class ClientListingDao {
    public List<ClientListingDao.ClienteResumo> listarTodos(Connection var1) throws SQLException {
       ArrayList var2 = new ArrayList();
-      String var3 = "SELECT\n    user_id,\n    zsgo_code,\n    status,\n    tentativas,\n    ultimo_erro,\n    atualizado_em,\n    content_hash,\n    zsgo_dados->'data'->'identity'->>'name' AS nome,\n    zsgo_dados->'data'->'identity'->>'tax_id' AS nif,\n    zsgo_dados->'data'->'settings'->>'email' AS email,\n    zsgo_dados->'data'->'billing'->>'exemption_code' AS exemption_code,\n    zsgo_dados->'data'->'address'->>'region_code' AS region_code,\n    zsgo_dados->'data'->'address'->>'address' AS morada,\n    zsgo_dados->'data'->'address'->>'postal_code' AS codigo_postal,\n    zsgo_dados->'data'->'address'->>'city' AS cidade,\n    zsgo_dados->'data'->'address'->>'country_code' AS pais\nFROM zsgo_client_sync\nORDER BY atualizado_em DESC\n";
+      String var3 = """
+         SELECT
+             s.user_id, s.zsgo_code, s.status, s.tentativas, s.ultimo_erro, s.atualizado_em, s.content_hash,
+             COALESCE(s.zsgo_dados->'data'->'identity'->>'name', u.name) AS nome,
+             s.zsgo_dados->'data'->'identity'->>'tax_id' AS nif,
+             s.zsgo_dados->'data'->'settings'->>'email' AS email,
+             s.zsgo_dados->'data'->'billing'->>'exemption_code' AS exemption_code,
+             s.zsgo_dados->'data'->'address'->>'region_code' AS region_code,
+             s.zsgo_dados->'data'->'address'->>'address' AS morada,
+             s.zsgo_dados->'data'->'address'->>'postal_code' AS codigo_postal,
+             s.zsgo_dados->'data'->'address'->>'city' AS cidade,
+             s.zsgo_dados->'data'->'address'->>'country_code' AS pais
+         FROM zsgo_client_sync s
+         -- nome do Cyclos para os clientes que ainda não foram criados no ZSGO
+         LEFT JOIN public.users u ON u.id = s.user_id
+         ORDER BY s.atualizado_em DESC
+         """;
 
       try (
          Statement var4 = var1.createStatement();
