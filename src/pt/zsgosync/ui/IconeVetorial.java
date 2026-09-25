@@ -112,6 +112,38 @@ public class IconeVetorial extends JComponent {
                var0.draw(new java.awt.geom.Line2D.Float(var16, var17, var18, var19));
             }
             break;
+         case "tarefas": {
+            // calendário com um visto
+            var0.draw(new Float(var4, var4 + 2, var5, var6 - 2, 2.0F, 2.0F));
+            var0.draw(new java.awt.geom.Line2D.Float(var4, var4 + var6 * 0.35F, var2 - var4, var4 + var6 * 0.35F));
+            var0.draw(new java.awt.geom.Line2D.Float(var4 + var5 * 0.3F, var4, var4 + var5 * 0.3F, var4 + 4));
+            var0.draw(new java.awt.geom.Line2D.Float(var4 + var5 * 0.7F, var4, var4 + var5 * 0.7F, var4 + 4));
+            float cx = var4 + var5 * 0.3F;
+            float cy = var4 + var6 * 0.68F;
+            var0.draw(new java.awt.geom.Line2D.Float(cx, cy, cx + var5 * 0.15F, cy + var6 * 0.13F));
+            var0.draw(new java.awt.geom.Line2D.Float(cx + var5 * 0.15F, cy + var6 * 0.13F, cx + var5 * 0.45F, cy - var6 * 0.15F));
+            break;
+         }
+         case "ocasional": {
+            // recibo com a borda de baixo em serrilha
+            float x0 = var4 + 2;
+            float x1 = var2 - var4 - 2;
+            float yb = var3 - var4;
+            java.awt.geom.Path2D.Float p = new java.awt.geom.Path2D.Float();
+            p.moveTo(x0, yb);
+            p.lineTo(x0, var4);
+            p.lineTo(x1, var4);
+            p.lineTo(x1, yb);
+            float passo = (x1 - x0) / 4.0F;
+            for (int i = 0; i < 4; i++) {
+               p.lineTo(x1 - passo * i - passo / 2.0F, yb - 2.5F);
+               p.lineTo(x1 - passo * (i + 1), yb);
+            }
+            var0.draw(p);
+            var0.draw(new java.awt.geom.Line2D.Float(x0 + 2, var4 + var6 * 0.3F, x1 - 2, var4 + var6 * 0.3F));
+            var0.draw(new java.awt.geom.Line2D.Float(x0 + 2, var4 + var6 * 0.55F, x1 - 4, var4 + var6 * 0.55F));
+            break;
+         }
          default:
             var0.draw(new java.awt.geom.Ellipse2D.Float(var4, var4, var5, var6));
       }

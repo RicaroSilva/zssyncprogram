@@ -27,7 +27,7 @@ public class PainelSidebar extends JPanel implements Tema.TemaOuvinte {
 
    public PainelSidebar(List<PainelSidebar.Item> var1) {
       this.setLayout(new BoxLayout(this, 1));
-      this.setPreferredSize(new Dimension(196, 10));
+      this.setPreferredSize(new Dimension(224, 10));
       this.setBorder(new EmptyBorder(18, 12, 18, 12));
 
       for (final PainelSidebar.Item var3 : var1) {

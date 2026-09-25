@@ -7,6 +7,8 @@ mensal de comissões, notas de crédito de chargebacks e painel gráfico.
 
 - `painel.bat` — abre o painel gráfico.
 - `run.bat` — corre a sincronização de clientes em linha de comando.
+- `agendador.bat` — abre o agendador das tarefas automáticas (deixar a
+  janela aberta). As tarefas configuram-se no painel, em "Tarefas agendadas".
 
 Ambos precisam de `config.properties` na mesma pasta (copiar de
 `config.properties.example` e preencher). Esse ficheiro tem segredos e
@@ -14,7 +16,7 @@ Ambos precisam de `config.properties` na mesma pasta (copiar de
 
 ## Painel
 
-- **Resumo** — números do mês anterior.
+- **Resumo** — números do mês (com ◀ ▶ para mudar de mês).
 - **Sincronizar Clientes** — cria no ZSGO os clientes novos/pendentes.
 - **Faturação** — escolhe-se o mês e aparece cada fatura desse mês:
   estado, valor enviado, **valor que está no ZSGO** e diferença.
@@ -25,7 +27,12 @@ Ambos precisam de `config.properties` na mesma pasta (copiar de
   - Duplo-clique numa fatura: rubricas enviadas, erro completo e o documento
     lido do ZSGO (linhas e resposta completa).
   - *Exportar*: faturas, linhas por rubrica ou notas de crédito em CSV.
-- **Clientes** / **Histórico**.
+- **Faturação ocasional** — em preparação (ver CLAUDE.md).
+- **Clientes** — lista dos clientes no ZSGO com resumo, filtros e detalhe.
+- **Tarefas agendadas** — sincronizar clientes, atualizar dados dos clientes
+  e faturação mensal a uma hora marcada; correm pelo `agendador.bat`
+  (tabelas `zsgo_tarefas` e `zsgo_agendador`).
+- **Histórico**.
 - **Ferramentas** (topo): gerir utilizadores, testar ligação, descobrir limite.
 
 ## Estrutura

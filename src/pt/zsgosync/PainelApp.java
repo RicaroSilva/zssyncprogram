@@ -54,6 +54,8 @@ import pt.zsgosync.ui.PainelClientes;
 import pt.zsgosync.ui.PainelDescobrirLimite;
 import pt.zsgosync.ui.PainelExecucao;
 import pt.zsgosync.ui.PainelFaturacao;
+import pt.zsgosync.ui.PainelFaturacaoOcasional;
+import pt.zsgosync.ui.PainelTarefas;
 import pt.zsgosync.ui.PainelHistorico;
 import pt.zsgosync.ui.PainelLogin;
 import pt.zsgosync.ui.PainelResumo;
@@ -100,6 +102,8 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
    private JPanel abaClientes;
    private JPanel abaFaturacao;
    private PainelFaturacao painelFaturacao;
+   private PainelTarefas painelTarefas;
+   private final PainelFaturacaoOcasional painelOcasional = new PainelFaturacaoOcasional();
    private JPanel abaListaClientes;
    private JPanel wrapperClientes;
    private JLabel infoClientes;
@@ -140,8 +144,22 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       this.conteudo.add(this.abaFaturacao, "faturacao");
       this.conteudo.add(this.abaListaClientes, "clientes");
       this.conteudo.add(this.abaHistorico, "historico");
+      this.painelTarefas = new PainelTarefas(() -> {
+         try {
+            return new AppConfig("config.properties");
+         } catch (java.io.IOException var1x) {
+            throw new java.io.UncheckedIOException("Não foi possível ler o config.properties", var1x);
+         }
+      }, var2.username);
+      this.conteudo.add(this.painelTarefas, "tarefas");
+      this.conteudo.add(this.painelOcasional, "ocasional");
       this.sidebar.aoSelecionar(var1x -> {
          this.cardLayout.show(this.conteudo, var1x);
+         if ("tarefas".equals(var1x)) {
+            this.painelTarefas.aoMostrar();
+         } else {
+            this.painelTarefas.aoEsconder();
+         }
          if ("resumo".equals(var1x)) {
             this.carregarResumo();
          } else if ("faturacao".equals(var1x)) {
@@ -170,7 +188,9 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       var1.add(new PainelSidebar.Item("resumo", "resumo", "Resumo"));
       var1.add(new PainelSidebar.Item("sincronizar", "sincronizar", "Sincronizar Clientes"));
       var1.add(new PainelSidebar.Item("faturacao", "faturacao", "Faturação"));
+      var1.add(new PainelSidebar.Item("ocasional", "ocasional", "Faturação ocasional"));
       var1.add(new PainelSidebar.Item("clientes", "clientes", "Clientes"));
+      var1.add(new PainelSidebar.Item("tarefas", "tarefas", "Tarefas agendadas"));
       var1.add(new PainelSidebar.Item("historico", "historico", "Histórico"));
       return new PainelSidebar(var1);
    }
