@@ -16,12 +16,15 @@ public class InvoiceLineDetailDao {
 
       try (Statement var3 = var1.createStatement()) {
          var3.execute(var2);
+         // origem_id: conta de origem da fatura (clientes com comissões redirecionadas
+         // têm uma fatura por origem). Linhas antigas ficam com NULL.
+         var3.execute("ALTER TABLE zsgo_invoice_line_detail ADD COLUMN IF NOT EXISTS origem_id BIGINT");
          var3.execute("CREATE INDEX IF NOT EXISTS idx_invoice_line_detail_cliente_mes ON zsgo_invoice_line_detail (cliente_id, ano, mes)");
       }
    }
 
-   public void inserirLinhas(Connection var1, String var2, int var3, int var4, List<BillingLine> var5) throws SQLException {
-      String var6 = "INSERT INTO zsgo_invoice_line_detail\n    (cliente_id, ano, mes, rubrica, product_reference, nr_transacoes, valor, descricao)\nVALUES (?, ?, ?, ?, ?, ?, ?, ?)\n";
+   public void inserirLinhas(Connection var1, String var2, String origem, int var3, int var4, List<BillingLine> var5) throws SQLException {
+      String var6 = "INSERT INTO zsgo_invoice_line_detail\n    (cliente_id, ano, mes, rubrica, product_reference, nr_transacoes, valor, descricao, origem_id)\nVALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n";
 
       try (PreparedStatement var7 = var1.prepareStatement(var6)) {
          long var8 = paraLong(var2);
@@ -40,6 +43,7 @@ public class InvoiceLineDetailDao {
             }
 
             var7.setString(8, var11.descricaoLinha);
+            var7.setLong(9, origem != null ? paraLong(origem) : var8);
             var7.addBatch();
          }
 

@@ -25,6 +25,7 @@ public class RelatorioService {
       RelatorioService.Relatorio var4 = new RelatorioService.Relatorio();
       var4.resumoFaturas = this.invoiceDao.obterResumo(var1, var2, var3);
       var4.errosFaturas = this.invoiceDao.listarErros(var1, var2, var3);
+      var4.faturas = this.invoiceDao.listarFaturas(var1, var2, var3);
       var4.resumoNotasCredito = this.creditNoteDao.obterResumo(var1, var2, var3);
       var4.errosNotasCredito = this.creditNoteDao.listarErros(var1, var2, var3);
       var4.linhasPorRubrica = this.lineDetailDao.obterPorMes(var1, var2, var3);
@@ -34,6 +35,7 @@ public class RelatorioService {
    public static class Relatorio {
       public InvoiceSyncDao.Resumo resumoFaturas;
       public List<InvoiceSyncDao.LinhaErro> errosFaturas;
+      public List<InvoiceSyncDao.FaturaDetalhe> faturas;
       public CreditNoteSyncDao.Resumo resumoNotasCredito;
       public List<CreditNoteSyncDao.LinhaErro> errosNotasCredito;
       public List<InvoiceLineDetailDao.LinhaDetalhe> linhasPorRubrica;

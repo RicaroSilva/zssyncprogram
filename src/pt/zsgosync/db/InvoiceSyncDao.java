@@ -139,6 +139,75 @@ public class InvoiceSyncDao {
       return var4;
    }
 
+   /**
+    * Todas as faturas do mês (seja qual for o estado), com o id no ZSGO, o
+    * valor enviado e o resumo das rubricas gravadas em zsgo_invoice_line_detail
+    * — para comparar fatura a fatura com o que aparece no ZSGO.
+    */
+   public List<InvoiceSyncDao.FaturaDetalhe> listarFaturas(Connection var1, int var2, int var3) throws SQLException {
+      List<InvoiceSyncDao.FaturaDetalhe> var4 = new ArrayList<>();
+      String var5 = """
+         SELECT f.user_id, f.origem_id, f.status, f.zsgo_sale_id, f.valor_total, f.pdf_url,
+                f.tentativas, f.ultimo_erro, f.atualizado_em,
+                s.zsgo_code,
+                s.zsgo_dados->'data'->'identity'->>'name' AS nome,
+                s.zsgo_dados->'data'->'identity'->>'tax_id' AS nif,
+                uo.name AS nome_origem,
+                l.n_linhas, l.n_transacoes, l.soma_linhas, l.rubricas
+         FROM zsgo_invoice_sync f
+         LEFT JOIN zsgo_client_sync s ON s.user_id = f.user_id
+         LEFT JOIN public.users uo ON uo.id = f.origem_id AND f.origem_id <> f.user_id
+         LEFT JOIN LATERAL (
+             SELECT COUNT(*) AS n_linhas,
+                    SUM(d.nr_transacoes) AS n_transacoes,
+                    SUM(d.valor) AS soma_linhas,
+                    string_agg(COALESCE(d.rubrica, '?') || ' | ' || COALESCE(d.nr_transacoes::text, '?')
+                               || ' transações | ' || COALESCE(d.valor::text, '?') || ' €'
+                               || COALESCE(' | ' || d.descricao, ''), E'\n' ORDER BY d.rubrica) AS rubricas
+             FROM zsgo_invoice_line_detail d
+             WHERE d.cliente_id = f.user_id AND d.ano = f.ano AND d.mes = f.mes
+               AND (d.origem_id = f.origem_id
+                    OR (d.origem_id IS NULL AND NOT EXISTS (
+                          SELECT 1 FROM zsgo_invoice_sync f2
+                          WHERE f2.user_id = f.user_id AND f2.ano = f.ano AND f2.mes = f.mes
+                            AND f2.origem_id <> f.origem_id)))
+         ) l ON true
+         WHERE f.ano = ? AND f.mes = ?
+         ORDER BY f.user_id ASC, f.origem_id ASC
+         """;
+
+      try (PreparedStatement var6 = var1.prepareStatement(var5)) {
+         var6.setInt(1, var2);
+         var6.setInt(2, var3);
+
+         try (ResultSet var7 = var6.executeQuery()) {
+            while (var7.next()) {
+               InvoiceSyncDao.FaturaDetalhe var8 = new InvoiceSyncDao.FaturaDetalhe();
+               var8.clienteId = String.valueOf(var7.getLong("user_id"));
+               var8.origemId = String.valueOf(var7.getLong("origem_id"));
+               var8.nomeOrigem = var7.getString("nome_origem");
+               var8.status = var7.getString("status");
+               var8.zsgoSaleId = var7.getString("zsgo_sale_id");
+               var8.valorTotal = var7.getBigDecimal("valor_total");
+               var8.pdfUrl = var7.getString("pdf_url");
+               var8.tentativas = var7.getInt("tentativas");
+               var8.ultimoErro = var7.getString("ultimo_erro");
+               var8.atualizadoEm = var7.getTimestamp("atualizado_em");
+               var8.zsgoCode = var7.getString("zsgo_code");
+               var8.nome = var7.getString("nome");
+               var8.nif = var7.getString("nif");
+               var8.nLinhas = var7.getInt("n_linhas");
+               var8.nTransacoes = var7.getLong("n_transacoes");
+               var8.somaLinhas = var7.getBigDecimal("soma_linhas");
+               var8.rubricas = var7.getString("rubricas");
+               var4.add(var8);
+            }
+         }
+      }
+
+      return var4;
+   }
+
    private static long paraLong(String var0) {
       try {
          return Long.parseLong(var0.trim());
@@ -152,6 +221,30 @@ public class InvoiceSyncDao {
       public String zsgoSaleId;
       public String pdfUrl;
       public int tentativas;
+   }
+
+   public static class FaturaDetalhe {
+      public String clienteId;
+      public String origemId;
+      public String nomeOrigem;
+      public String status;
+      public String zsgoSaleId;
+      public BigDecimal valorTotal;
+      public String pdfUrl;
+      public int tentativas;
+      public String ultimoErro;
+      public java.sql.Timestamp atualizadoEm;
+      public String zsgoCode;
+      public String nome;
+      public String nif;
+      public int nLinhas;
+      public long nTransacoes;
+      public BigDecimal somaLinhas;
+      public String rubricas;
+
+      public boolean isRedirecionada() {
+         return this.origemId != null && !this.origemId.equals(this.clienteId);
+      }
    }
 
    public static class LinhaErro {

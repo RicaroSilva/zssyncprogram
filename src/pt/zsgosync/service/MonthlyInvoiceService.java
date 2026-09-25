@@ -217,7 +217,7 @@ public class MonthlyInvoiceService {
                   this.invoiceDao.marcarPdfGerado(var64, var1, var2, var4, var5, var29);
                }
 
-               this.lineDetailDao.inserirLinhas(var64, var1, var4, var5, var3);
+               this.lineDetailDao.inserirLinhas(var64, var1, var2, var4, var5, var3);
                var23 += (System.nanoTime() - var39) / 1000000L;
                var12.incrementAndGet();
                Object var41 = this.lockValorTotal;
