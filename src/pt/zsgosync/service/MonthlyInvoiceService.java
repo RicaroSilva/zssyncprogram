@@ -195,6 +195,18 @@ public class MonthlyInvoiceService {
             return;
          }
 
+         if (var32 != null && var32.incerto && var32.zsgoSaleId == null) {
+            // Da última vez o ZSGO não respondeu: a fatura pode já existir lá.
+            // Não se cria outra vez sem alguém confirmar no painel.
+            String msg = "[Verificar no ZSGO] Da última vez o ZSGO não respondeu ao criar esta fatura: pode já existir. "
+               + "Confirme no ZSGO e, no painel (duplo-clique na fatura), indique o número da fatura existente ou autorize criar outra vez.";
+            this.invoiceDao.marcarErro(var64, var1, var2, var4, var5, msg);
+            var8.incrementAndGet();
+            var25 = "erro(incerto)";
+            var15.aoItemFalhar(var16, msg);
+            return;
+         }
+
          String var33 = ((BillingLine)var3.get(0)).zsgoCode;
          if (var33 != null && !var33.isBlank()) {
             String var67 = var32 != null ? var32.zsgoSaleId : null;
@@ -255,6 +267,9 @@ public class MonthlyInvoiceService {
 
          try (Connection var27 = DriverManager.getConnection(this.dbUrl, this.dbUser, this.dbPassword)) {
             this.invoiceDao.marcarErro(var27, var1, var2, var4, var5, var26);
+            if (var62 instanceof pt.zsgosync.zsgo.ZsgoResultadoIncertoException) {
+               this.invoiceDao.marcarIncerto(var27, var1, var2, var4, var5, true);
+            }
          } catch (SQLException var60) {
             LOG.severe("Falha adicional ao gravar erro da fatura " + var16 + ": " + Erros.descrever(var60));
          }

@@ -65,7 +65,7 @@ public class ZsgoApiClient {
       String var3 = this.buildPayload(var1);
       HttpRequest var4 = HttpRequest.newBuilder()
          .uri(URI.create(this.baseUrl + "/clients"))
-         .timeout(Duration.ofSeconds(20L))
+         .timeout(Duration.ofSeconds(60L))
          .header("Authorization", "Bearer " + this.token)
          .header("Content-Type", "application/json")
          .header("Accept", "application/json")
@@ -75,9 +75,16 @@ public class ZsgoApiClient {
       HttpResponse var2;
       try {
          var2 = this.http.send(var4, BodyHandlers.ofString());
-      } catch (InterruptedException | IOException var8) {
+      } catch (InterruptedException var8) {
          Thread.currentThread().interrupt();
-         throw new ZsgoApiException("Falha de rede ao chamar POST /clients: " + var8.getMessage(), var8);
+         throw new ZsgoApiException("Interrompido ao chamar POST /clients.", var8);
+      } catch (IOException var8) {
+         if (naoChegouAoServidor(var8)) {
+            throw new ZsgoApiException("Falha de rede ao chamar POST /clients (o pedido não chegou ao ZSGO): " + var8.getMessage(), var8);
+         }
+         throw new ZsgoResultadoIncertoException(
+            "Sem resposta do ZSGO ao criar o cliente (" + var8.getClass().getSimpleName() + ") — o cliente PODE ter sido criado. Confirme no ZSGO.", var8
+         );
       }
 
       int var5 = var2.statusCode();
@@ -154,14 +161,18 @@ public class ZsgoApiClient {
    public ZsgoApiClient.SaleResult createSale(String var1) throws ZsgoApiException {
       HttpRequest var2 = HttpRequest.newBuilder()
          .uri(URI.create(this.baseUrl + "/sales"))
-         .timeout(Duration.ofSeconds(20L))
+         .timeout(Duration.ofSeconds(120L))
          .header("Authorization", "Bearer " + this.token)
          .header("Content-Type", "application/json")
          .header("Accept", "application/json")
          .POST(BodyPublishers.ofString(var1))
          .build();
-      HttpResponse var3 = this.sendComRetry429(var2);
+      HttpResponse var3 = this.sendComRetry429(var2, false);
       int var4 = var3.statusCode();
+      if (var4 == 502 || var4 == 503 || var4 == 504) {
+         // Gateway/servidor sem resposta: o ZSGO pode ter criado a fatura na mesma.
+         throw new ZsgoResultadoIncertoException("POST /sales devolveu " + var4 + " (servidor sem resposta) — a fatura PODE ter sido criada. Não foi reenviada.", null);
+      }
       if (var4 != 200 && var4 != 201) {
          String var8 = unescapeJson(firstMatch(MESSAGE_PATTERN, (String)var3.body()));
          String var9 = var8 != null ? var8 : (String)var3.body();
@@ -201,6 +212,48 @@ public class ZsgoApiClient {
    }
 
    private HttpResponse<String> sendComRetry429(HttpRequest var1) throws ZsgoApiException {
+      return this.sendComRetry429(var1, true);
+   }
+
+   /** Procura documentos de venda (GET /sales?search=...). */
+   public List<ZsgoDocumento> procurarSales(String texto) throws ZsgoApiException {
+      String q = java.net.URLEncoder.encode(texto, java.nio.charset.StandardCharsets.UTF_8);
+      HttpRequest pedido = HttpRequest.newBuilder()
+         .uri(URI.create(this.baseUrl + "/sales?per_page=20&search=" + q))
+         .timeout(Duration.ofSeconds(30L))
+         .header("Authorization", "Bearer " + this.token)
+         .header("Accept", "application/json")
+         .GET()
+         .build();
+      HttpResponse<String> resposta = this.sendComRetry429(pedido);
+      if (resposta.statusCode() != 200) {
+         String msg = unescapeJson(firstMatch(MESSAGE_PATTERN, resposta.body()));
+         throw new ZsgoApiException("GET /sales?search devolveu " + resposta.statusCode() + ": " + (msg != null ? msg : resposta.body()), resposta.statusCode());
+      }
+      try {
+         return ZsgoDocumento.lerLista(resposta.body());
+      } catch (IllegalArgumentException e) {
+         throw new ZsgoApiException("Resposta do ZSGO em formato inesperado: " + resposta.body(), resposta.statusCode());
+      }
+   }
+
+   /** O pedido não chegou a sair (ligação recusada / não estabelecida): é seguro repetir. */
+   private static boolean naoChegouAoServidor(Throwable e) {
+      for (Throwable t = e; t != null; t = t.getCause()) {
+         if (t instanceof java.net.ConnectException || t instanceof java.net.http.HttpConnectTimeoutException
+            || t instanceof java.net.UnknownHostException || t instanceof java.nio.channels.UnresolvedAddressException) {
+            return true;
+         }
+      }
+      return false;
+   }
+
+   /**
+    * @param idempotente false para pedidos que criam coisas (POST /sales): se
+    *        o pedido pode ter chegado ao ZSGO e não houve resposta, NÃO se
+    *        repete (senão cria duplicados) — lança ZsgoResultadoIncertoException.
+    */
+   private HttpResponse<String> sendComRetry429(HttpRequest var1, boolean idempotente) throws ZsgoApiException {
       int var2 = 0;
       int var3 = 1;
 
@@ -224,6 +277,14 @@ public class ZsgoApiClient {
                var4 = this.http.send(var1, BodyHandlers.ofString());
                break;
             } catch (IOException var11) {
+               if (!idempotente && !naoChegouAoServidor(var11)) {
+                  throw new ZsgoResultadoIncertoException(
+                     "Sem resposta do ZSGO (" + var11.getClass().getSimpleName() + (var11.getMessage() != null ? ": " + var11.getMessage() : "")
+                        + ") — o documento PODE ter sido criado. Não foi reenviado para não duplicar.",
+                     var11
+                  );
+               }
+
                if (++var2 > 3) {
                   throw new ZsgoApiException("Falha de rede após " + var2 + " tentativas: " + var11.getMessage(), var11);
                }

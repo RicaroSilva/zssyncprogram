@@ -25,11 +25,14 @@ public class InvoiceSyncDao {
          var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_anulado BOOLEAN");
          var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_conferido_em TIMESTAMP");
          var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_erro_conferencia TEXT");
+         // Pedido de criação sem resposta: a fatura pode existir no ZSGO. Enquanto
+         // estiver marcada, a faturação NÃO volta a criá-la (evita duplicados).
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_incerto BOOLEAN NOT NULL DEFAULT FALSE");
       }
    }
 
    public InvoiceSyncDao.Estado getEstado(Connection var1, String var2, String var3, int var4, int var5) throws SQLException {
-      String var6 = "SELECT status, zsgo_sale_id, pdf_url, tentativas FROM zsgo_invoice_sync WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?";
+      String var6 = "SELECT status, zsgo_sale_id, pdf_url, tentativas, zsgo_incerto FROM zsgo_invoice_sync WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?";
 
       InvoiceSyncDao.Estado var10;
       try (PreparedStatement var7 = var1.prepareStatement(var6)) {
@@ -48,6 +51,7 @@ public class InvoiceSyncDao {
             var15.zsgoSaleId = var8.getString("zsgo_sale_id");
             var15.pdfUrl = var8.getString("pdf_url");
             var15.tentativas = var8.getInt("tentativas");
+            var15.incerto = var8.getBoolean("zsgo_incerto");
             var10 = var15;
          }
       }
@@ -159,7 +163,7 @@ public class InvoiceSyncDao {
          SELECT f.user_id, f.origem_id, f.status, f.zsgo_sale_id, f.valor_total, f.pdf_url,
                 f.tentativas, f.ultimo_erro, f.atualizado_em,
                 f.zsgo_numero, f.zsgo_total, f.zsgo_liquido, f.zsgo_iva, f.zsgo_estado, f.zsgo_anulado,
-                f.zsgo_conferido_em, f.zsgo_erro_conferencia,
+                f.zsgo_conferido_em, f.zsgo_erro_conferencia, f.zsgo_incerto,
                 s.zsgo_code,
                 s.zsgo_dados->'data'->'identity'->>'name' AS nome,
                 s.zsgo_dados->'data'->'identity'->>'tax_id' AS nif,
@@ -219,12 +223,52 @@ public class InvoiceSyncDao {
                var8.zsgoAnulado = var7.getBoolean("zsgo_anulado");
                var8.zsgoConferidoEm = var7.getTimestamp("zsgo_conferido_em");
                var8.zsgoErroConferencia = var7.getString("zsgo_erro_conferencia");
+               var8.incerto = var7.getBoolean("zsgo_incerto");
                var4.add(var8);
             }
          }
       }
 
       return var4;
+   }
+
+   public void marcarIncerto(Connection c, String cliente, String origem, int ano, int mes, boolean incerto) throws SQLException {
+      try (PreparedStatement ps = c.prepareStatement("UPDATE zsgo_invoice_sync SET zsgo_incerto = ?, atualizado_em = now() WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?")) {
+         ps.setBoolean(1, incerto);
+         ps.setLong(2, paraLong(cliente));
+         ps.setLong(3, paraLong(origem));
+         ps.setInt(4, ano);
+         ps.setInt(5, mes);
+         ps.executeUpdate();
+      }
+   }
+
+   /**
+    * A fatura existe no ZSGO (confirmado pelo utilizador): associa o id e o
+    * PDF e tira a marca de incerteza. A próxima faturação só envia o PDF ao Cyclos.
+    */
+   public void associarDocumento(Connection c, String cliente, String origem, int ano, int mes, String zsgoSaleId, String pdfUrl, java.math.BigDecimal total)
+      throws SQLException {
+      String sql = """
+         UPDATE zsgo_invoice_sync SET zsgo_sale_id = ?, pdf_url = COALESCE(?, pdf_url), valor_total = COALESCE(valor_total, ?),
+             status = CASE WHEN ?::text IS NULL THEN 'FATURA_CRIADA' ELSE 'PDF_GERADO' END,
+             zsgo_incerto = FALSE,
+             ultimo_erro = 'Associada à fatura que já existia no ZSGO (' || ?::text || '). Falta enviar o PDF ao Cyclos: gere a faturação outra vez.',
+             atualizado_em = now()
+         WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?
+         """;
+      try (PreparedStatement ps = c.prepareStatement(sql)) {
+         ps.setString(1, zsgoSaleId);
+         ps.setString(2, pdfUrl);
+         ps.setBigDecimal(3, total);
+         ps.setString(4, pdfUrl);
+         ps.setString(5, zsgoSaleId);
+         ps.setLong(6, paraLong(cliente));
+         ps.setLong(7, paraLong(origem));
+         ps.setInt(8, ano);
+         ps.setInt(9, mes);
+         ps.executeUpdate();
+      }
    }
 
    /** Grava o que o ZSGO devolveu para esta fatura (ou o erro, se não foi possível ler). */
@@ -269,6 +313,7 @@ public class InvoiceSyncDao {
       public String zsgoSaleId;
       public String pdfUrl;
       public int tentativas;
+      public boolean incerto;
    }
 
    public static class FaturaDetalhe {
@@ -298,6 +343,7 @@ public class InvoiceSyncDao {
       public boolean zsgoAnulado;
       public java.sql.Timestamp zsgoConferidoEm;
       public String zsgoErroConferencia;
+      public boolean incerto;
 
       /** Diferença entre o que o ZSGO tem e o que o programa enviou (null se não conferida). */
       public BigDecimal diferenca() {

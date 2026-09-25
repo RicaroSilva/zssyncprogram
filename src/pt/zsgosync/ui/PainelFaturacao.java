@@ -424,7 +424,7 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
             if (f.valorTotal != null) {
                valorFaturado = valorFaturado.add(f.valorTotal);
             }
-         } else if (estado.startsWith("Erro")) {
+         } else if (estado.startsWith("Erro") || estado.startsWith("Verificar")) {
             erros++;
          }
          if (f.zsgoConferidoEm != null && f.zsgoErroConferencia == null) {
@@ -504,6 +504,9 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
    }
 
    static String estadoSimples(InvoiceSyncDao.FaturaDetalhe f) {
+      if (f.incerto && f.zsgoSaleId == null) {
+         return "Verificar no ZSGO";
+      }
       if ("SINCRONIZADO".equals(f.status)) {
          return f.zsgoAnulado ? "Anulada no ZSGO" : "Faturada";
       }
@@ -557,7 +560,7 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
             InvoiceSyncDao.FaturaDetalhe f = PainelFaturacao.this.linhasFaturas.get(e.getIdentifier());
             String estado = estadoSimples(f);
             boolean passa = switch (filtro == null ? "Todas" : filtro) {
-               case "Com erro" -> estado.startsWith("Erro") || "Incompleta".equals(estado);
+               case "Com erro" -> estado.startsWith("Erro") || estado.startsWith("Verificar") || "Incompleta".equals(estado);
                case "Com diferença no ZSGO" -> f.temDiferenca() || f.zsgoErroConferencia != null;
                case "Por conferir" -> f.zsgoSaleId != null && f.zsgoConferidoEm == null;
                case "Faturadas" -> "Faturada".equals(estado);
@@ -704,6 +707,16 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
       JButton btnFechar = new JButton("Fechar");
       btnFechar.addActionListener(e -> dialogo.dispose());
       JPanel botoes = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+      if (f.incerto && f.zsgoSaleId == null) {
+         JButton btnExiste = new JButton("Existe no ZSGO — indicar o nº");
+         btnExiste.setToolTipText("A fatura foi criada no ZSGO: indique o número (ex.: FR A/123) para a associar, sem criar outra.");
+         btnExiste.addActionListener(e -> this.associarExistente(dialogo, f));
+         JButton btnRecriar = new JButton("Não existe — criar outra vez");
+         btnRecriar.setToolTipText("Confirmou no ZSGO que esta fatura não existe: a próxima faturação volta a criá-la.");
+         btnRecriar.addActionListener(e -> this.autorizarRecriar(dialogo, f));
+         botoes.add(btnExiste);
+         botoes.add(btnRecriar);
+      }
       botoes.add(btnLer);
       botoes.add(btnCopiar);
       botoes.add(btnFechar);
@@ -715,6 +728,73 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
       dialogo.pack();
       dialogo.setLocationRelativeTo(this);
       dialogo.setVisible(true);
+   }
+
+   private void associarExistente(JDialog dialogo, InvoiceSyncDao.FaturaDetalhe f) {
+      String nr = JOptionPane.showInputDialog(dialogo,
+         "Número da fatura que já existe no ZSGO para este cliente e mês\n(ex.: FR A/123, ou o id do documento):", "Associar fatura existente",
+         JOptionPane.QUESTION_MESSAGE);
+      if (nr == null || nr.isBlank()) {
+         return;
+      }
+      int ano = this.anoAtual;
+      int mes = this.mesAtual;
+      new Thread(() -> {
+         try {
+            ZsgoDocumento d = ConferenciaService.encontrarDocumento(this.config.get(), nr);
+            SwingUtilities.invokeLater(() -> {
+               if (d == null) {
+                  JOptionPane.showMessageDialog(dialogo, "Não encontrei no ZSGO o documento \"" + nr + "\".", "Não encontrado", JOptionPane.WARNING_MESSAGE);
+                  return;
+               }
+               String resumo = "Documento " + (d.numero != null ? d.numero : d.id) + (d.total != null ? " — total " + MOEDA.format(d.total) : "")
+                  + (f.valorTotal != null ? "\nValor previsto para esta fatura: " + MOEDA.format(f.valorTotal) : "")
+                  + "\n\nAssociar este documento à fatura do cliente " + f.clienteId + "?";
+               if (JOptionPane.showConfirmDialog(dialogo, resumo, "Confirmar", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                  return;
+               }
+               new Thread(() -> {
+                  try {
+                     ConferenciaService.associar(this.config.get(), f, ano, mes, d);
+                     pt.zsgosync.HistoricoRun.registar(this.config.get(), "painel", "FATURA_ASSOCIADA",
+                        "Cliente " + f.clienteId + " " + mes + "/" + ano + ": associada ao documento " + (d.numero != null ? d.numero : d.id) + " já existente no ZSGO.");
+                     SwingUtilities.invokeLater(() -> {
+                        dialogo.dispose();
+                        this.recarregar("Fatura do cliente " + f.clienteId + " associada. Gere a faturação outra vez para enviar o PDF ao Cyclos.");
+                     });
+                  } catch (Exception ex) {
+                     SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(dialogo, Erros.descrever(ex), "Erro", JOptionPane.ERROR_MESSAGE));
+                  }
+               }, "associar-fatura").start();
+            });
+         } catch (Exception ex) {
+            SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(dialogo, "Não foi possível procurar no ZSGO: " + Erros.descrever(ex), "Erro",
+               JOptionPane.ERROR_MESSAGE));
+         }
+      }, "procurar-fatura").start();
+   }
+
+   private void autorizarRecriar(JDialog dialogo, InvoiceSyncDao.FaturaDetalhe f) {
+      String msg = "Confirmou no ZSGO que NÃO existe nenhuma fatura deste mês para o cliente " + f.clienteId + "?\n\n"
+         + "Se existir e disser que não, fica em duplicado.";
+      if (JOptionPane.showConfirmDialog(dialogo, msg, "Criar outra vez", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) {
+         return;
+      }
+      int ano = this.anoAtual;
+      int mes = this.mesAtual;
+      new Thread(() -> {
+         try {
+            ConferenciaService.autorizarRecriar(this.config.get(), f, ano, mes);
+            pt.zsgosync.HistoricoRun.registar(this.config.get(), "painel", "FATURA_RECRIAR_AUTORIZADO",
+               "Cliente " + f.clienteId + " " + mes + "/" + ano + ": confirmado que não existe no ZSGO; pode ser criada outra vez.");
+            SwingUtilities.invokeLater(() -> {
+               dialogo.dispose();
+               this.recarregar("Fatura do cliente " + f.clienteId + " liberta. Gere a faturação outra vez para a criar.");
+            });
+         } catch (Exception ex) {
+            SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(dialogo, Erros.descrever(ex), "Erro", JOptionPane.ERROR_MESSAGE));
+         }
+      }, "recriar-fatura").start();
    }
 
    private String textoDetalhe(InvoiceSyncDao.FaturaDetalhe f, ZsgoDocumento d) {
@@ -796,6 +876,11 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
          }
       } else if (f.zsgoSaleId != null) {
          b.append("  Ainda não conferido — carrega em \"Ler do ZSGO agora\".\n");
+      } else if (f.incerto) {
+         b.append("  PODE EXISTIR: o ZSGO não respondeu quando esta fatura foi pedida, por isso não se sabe se foi criada.\n");
+         b.append("  Procure no ZSGO as faturas deste cliente neste mês e depois use um dos botões:\n");
+         b.append("   • \"Existe no ZSGO — indicar o nº\": associa a fatura que lá está (não cria outra);\n");
+         b.append("   • \"Não existe — criar outra vez\": a próxima faturação volta a criá-la.\n");
       } else {
          b.append("  Este documento não existe no ZSGO.\n");
       }
@@ -896,6 +981,9 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
          } else if (s.startsWith("Erro") || s.startsWith("Anulada")) {
             this.setForeground(Tema.DESTRUCTIVE);
             this.setText("✖ " + s);
+         } else if (s.startsWith("Verificar")) {
+            this.setForeground(Tema.CARD_CORAL_FG);
+            this.setText("⚠ " + s);
          } else {
             this.setForeground(Tema.MUTED_FOREGROUND);
          }

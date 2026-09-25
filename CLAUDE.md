@@ -27,6 +27,12 @@ normais). Ver README.md para a estrutura.
 - Bug do ZSGO: `billing.exemption_code` ao criar cliente dá HTTP 500
   (reportado); o código continua a enviar.
 - Tentativas ilimitadas; erros gravados completos (`util/Erros.descrever`).
+- NUNCA repetir automaticamente pedidos que criam coisas no ZSGO (POST
+  /sales, POST /clients) quando o pedido pode ter chegado e não houve
+  resposta: isso criava faturas em duplicado (setembro 2026). Nesses casos
+  lança-se `ZsgoResultadoIncertoException`, a fatura fica com
+  `zsgo_incerto = true` e só volta a ser criada depois de alguém confirmar
+  no painel (associar o nº existente ou autorizar recriar).
 
 ## Por fazer / pedidos em espera
 

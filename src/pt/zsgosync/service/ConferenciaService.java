@@ -107,6 +107,49 @@ public class ConferenciaService {
       return criarCliente(cfg).getSale(zsgoSaleId);
    }
 
+   /**
+    * Encontra no ZSGO o documento indicado pelo utilizador: aceita o id interno
+    * ou o número do documento (ex.: "FR A/123"). Devolve null se não encontrar.
+    */
+   public static ZsgoDocumento encontrarDocumento(AppConfig cfg, String texto) throws Exception {
+      String t = texto.trim();
+      ZsgoApiClient zsgo = criarCliente(cfg);
+      // Um id não tem espaços nem barras; um número de documento (FR A/123) tem.
+      if (t.matches("[A-Za-z0-9-]+")) {
+         try {
+            ZsgoDocumento d = zsgo.getSale(t);
+            if (d.id != null) {
+               return d;
+            }
+         } catch (pt.zsgosync.zsgo.ZsgoApiException e) {
+            if (e.getStatusCode() != 404 && e.getStatusCode() != 422 && e.getStatusCode() != 400) {
+               throw e;
+            }
+         }
+      }
+      for (ZsgoDocumento d : zsgo.procurarSales(t)) {
+         if (d.id != null && (t.equalsIgnoreCase(d.numero) || t.equals(d.id))) {
+            // A lista pode não trazer tudo (PDF, linhas): lê o documento completo.
+            return zsgo.getSale(d.id);
+         }
+      }
+      return null;
+   }
+
+   /** A fatura existe no ZSGO: associa-a (a próxima faturação só envia o PDF ao Cyclos). */
+   public static void associar(AppConfig cfg, InvoiceSyncDao.FaturaDetalhe f, int ano, int mes, ZsgoDocumento d) throws Exception {
+      try (Connection c = ligar(cfg)) {
+         new InvoiceSyncDao().associarDocumento(c, f.clienteId, f.origemId, ano, mes, d.id, d.pdfUrl, d.total);
+      }
+   }
+
+   /** Confirmado que a fatura NÃO existe no ZSGO: a próxima faturação pode criá-la. */
+   public static void autorizarRecriar(AppConfig cfg, InvoiceSyncDao.FaturaDetalhe f, int ano, int mes) throws Exception {
+      try (Connection c = ligar(cfg)) {
+         new InvoiceSyncDao().marcarIncerto(c, f.clienteId, f.origemId, ano, mes, false);
+      }
+   }
+
    private static Connection ligar(AppConfig cfg) throws Exception {
       return DriverManager.getConnection(cfg.get("db.url"), cfg.get("db.user"), cfg.get("db.password"));
    }

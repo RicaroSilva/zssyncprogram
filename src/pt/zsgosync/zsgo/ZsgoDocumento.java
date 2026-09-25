@@ -27,6 +27,7 @@ public class ZsgoDocumento {
    public boolean anulado;
    public final List<Linha> linhas = new ArrayList<>();
    public String json;
+   public String pdfUrl;
 
    public static class Linha {
       public String id;
@@ -50,7 +51,34 @@ public class ZsgoDocumento {
       if (!(dados instanceof Map)) {
          return d;
       }
-      Map<String, Object> m = (Map<String, Object>) dados;
+      preencher(d, (Map<String, Object>) dados);
+      return d;
+   }
+
+   /** Lista de documentos (resposta de GET /sales): cada elemento de "data". */
+   @SuppressWarnings("unchecked")
+   public static List<ZsgoDocumento> lerLista(String json) {
+      List<ZsgoDocumento> r = new ArrayList<>();
+      Object raiz = Json.ler(json);
+      Object dados = raiz instanceof Map ? ((Map<String, Object>) raiz).get("data") : raiz;
+      if (dados instanceof List) {
+         for (Object o : (List<Object>) dados) {
+            if (o instanceof List && !((List<Object>) o).isEmpty()) {
+               o = ((List<Object>) o).get(0);
+            }
+            if (o instanceof Map) {
+               ZsgoDocumento d = new ZsgoDocumento();
+               d.json = o.toString();
+               preencher(d, (Map<String, Object>) o);
+               r.add(d);
+            }
+         }
+      }
+      return r;
+   }
+
+   @SuppressWarnings("unchecked")
+   private static void preencher(ZsgoDocumento d, Map<String, Object> m) {
       Map<String, Object> doc = m.get("document") instanceof Map ? (Map<String, Object>) m.get("document") : m;
       Map<String, Object> totais = m.get("totals") instanceof Map ? (Map<String, Object>) m.get("totals") : m;
 
@@ -59,6 +87,7 @@ public class ZsgoDocumento {
       d.tipo = texto(doc, "type", "document_type");
       d.estado = texto(doc, "status", "state");
       d.data = texto(doc, "date", "document_date", "issued_at", "created_at");
+      d.pdfUrl = texto(m, "pdf_url", "pdf");
       d.total = numero(totais, "total", "gross_total", "total_gross", "grand_total", "total_amount", "document_total", "total_with_tax");
       d.liquido = numero(totais, "net_total", "total_net", "subtotal", "total_without_tax", "net", "total_liquid");
       d.iva = numero(totais, "tax_total", "total_tax", "vat_total", "total_vat", "tax", "taxes", "vat");
@@ -97,7 +126,6 @@ public class ZsgoDocumento {
       if (d.total == null && d.liquido != null && d.iva != null) {
          d.total = d.liquido.add(d.iva);
       }
-      return d;
    }
 
    private static Object primeiro(Map<String, Object> m, String... chaves) {
