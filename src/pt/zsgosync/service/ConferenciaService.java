@@ -127,13 +127,21 @@ public class ConferenciaService {
             }
          }
       }
+      // Aceita o número completo ("FR A/10930") ou só o número ("10930").
+      List<ZsgoDocumento> soNumero = new ArrayList<>();
       for (ZsgoDocumento d : zsgo.procurarSales(t)) {
-         if (d.id != null && (t.equalsIgnoreCase(d.numero) || t.equals(d.id))) {
+         if (d.id == null) {
+            continue;
+         }
+         if (t.equalsIgnoreCase(d.numero) || t.equals(d.id)) {
             // A lista pode não trazer tudo (PDF, linhas): lê o documento completo.
             return zsgo.getSale(d.id);
          }
+         if (d.numero != null && (d.numero.endsWith("/" + t) || d.numero.equals(t))) {
+            soNumero.add(d);
+         }
       }
-      return null;
+      return soNumero.size() == 1 ? zsgo.getSale(soNumero.get(0).id) : null;
    }
 
    /** A fatura existe no ZSGO: associa-a (a próxima faturação só envia o PDF ao Cyclos). */
@@ -148,6 +156,62 @@ public class ConferenciaService {
       try (Connection c = ligar(cfg)) {
          new InvoiceSyncDao().marcarIncerto(c, f.clienteId, f.origemId, ano, mes, false);
       }
+   }
+
+   /**
+    * Diagnóstico: pede ao ZSGO a lista de faturas (e, se indicado, procura
+    * um número/id) e mostra a resposta em bruto e o que o programa percebeu.
+    * Serve para ajustar a leitura ao formato real do ZSGO.
+    */
+   public static String diagnostico(AppConfig cfg, String procura) {
+      ZsgoApiClient zsgo = criarCliente(cfg);
+      StringBuilder b = new StringBuilder();
+      b.append("DIAGNÓSTICO DO ZSGO — ").append(java.time.LocalDateTime.now().withNano(0)).append("\n");
+      b.append("zsgo.status.anulado = ").append(cfg.getOrDefault("zsgo.status.anulado", "")).append("\n\n");
+      secao(b, "1) GET /sales?page=1&per_page=3 (lista)", zsgo.getBruto("/sales?page=1&per_page=3"), true);
+      if (procura != null && !procura.isBlank()) {
+         String q = java.net.URLEncoder.encode(procura.trim(), java.nio.charset.StandardCharsets.UTF_8);
+         secao(b, "2) GET /sales?per_page=5&search=" + procura.trim() + " (procura)", zsgo.getBruto("/sales?per_page=5&search=" + q), true);
+         if (procura.trim().matches("[A-Za-z0-9-]+")) {
+            secao(b, "3) GET /sales/" + procura.trim() + " (documento)", zsgo.getBruto("/sales/" + procura.trim()), false);
+         }
+         try {
+            ZsgoDocumento d = encontrarDocumento(cfg, procura);
+            b.append("RESULTADO de \"Existe no ZSGO — indicar o nº\" com \"").append(procura.trim()).append("\": ")
+               .append(d == null ? "NÃO ENCONTRADO" : "encontrado → " + resumo(d)).append("\n");
+         } catch (Exception e) {
+            b.append("RESULTADO: erro — ").append(Erros.descrever(e)).append("\n");
+         }
+      }
+      return b.toString();
+   }
+
+   private static void secao(StringBuilder b, String titulo, String resposta, boolean lista) {
+      b.append("==== ").append(titulo).append(" ====\n");
+      String corpo = resposta.startsWith("HTTP ") && resposta.indexOf('\n') > 0 ? resposta.substring(resposta.indexOf('\n') + 1) : null;
+      b.append(resposta.length() > 6000 ? resposta.substring(0, 6000) + "\n… (cortado)" : resposta).append("\n");
+      if (corpo != null) {
+         try {
+            b.append("-- o programa percebeu:\n");
+            if (lista) {
+               ZsgoDocumento.Pagina p = ZsgoDocumento.lerPagina(corpo);
+               b.append("   páginas: ").append(p.totalPaginas).append(", documentos nesta página: ").append(p.documentos.size()).append("\n");
+               for (ZsgoDocumento d : p.documentos) {
+                  b.append("   • ").append(resumo(d)).append("\n");
+               }
+            } else {
+               b.append("   • ").append(resumo(ZsgoDocumento.ler(corpo))).append("\n");
+            }
+         } catch (Exception e) {
+            b.append("   não consegui ler: ").append(Erros.descrever(e)).append("\n");
+         }
+      }
+      b.append("\n");
+   }
+
+   private static String resumo(ZsgoDocumento d) {
+      return "id=" + d.id + " | nº=" + d.numero + " | cliente=" + d.clienteCodigo + " | total=" + d.total + " | data=" + d.data + " | estado=" + d.estado
+         + " | anulado=" + d.anulado + " | referência=" + d.referencia + " | notas=" + d.notas;
    }
 
    private static Connection ligar(AppConfig cfg) throws Exception {

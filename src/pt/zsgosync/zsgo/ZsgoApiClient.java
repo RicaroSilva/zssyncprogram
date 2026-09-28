@@ -215,6 +215,23 @@ public class ZsgoApiClient {
       return this.sendComRetry429(var1, true);
    }
 
+   /** Pedido GET em bruto (para o diagnóstico): devolve "HTTP nnn" + o corpo da resposta. */
+   public String getBruto(String caminho) {
+      try {
+         HttpRequest pedido = HttpRequest.newBuilder()
+            .uri(URI.create(this.baseUrl + caminho))
+            .timeout(Duration.ofSeconds(30L))
+            .header("Authorization", "Bearer " + this.token)
+            .header("Accept", "application/json")
+            .GET()
+            .build();
+         HttpResponse<String> r = this.sendComRetry429(pedido);
+         return "HTTP " + r.statusCode() + "\n" + r.body();
+      } catch (Exception e) {
+         return "FALHOU: " + pt.zsgosync.util.Erros.descrever(e);
+      }
+   }
+
    /** Procura documentos de venda (GET /sales?search=...). */
    public List<ZsgoDocumento> procurarSales(String texto) throws ZsgoApiException {
       return this.listarSales(1, 20, texto).documentos;

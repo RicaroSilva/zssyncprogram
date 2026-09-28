@@ -238,6 +238,9 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       JMenuItem var10 = new JMenuItem("Descobrir limite de pedidos do ZSGO");
       var10.addActionListener(var1x -> this.abrirDescobrirLimite());
       var7.add(var10);
+      JMenuItem var11 = new JMenuItem("Diagnóstico do ZSGO (faturas)");
+      var11.addActionListener(var1x -> this.abrirDiagnosticoZsgo());
+      var7.add(var11);
       this.btnFerramentas.setFocusPainted(false);
       this.btnFerramentas.setCursor(Cursor.getPredefinedCursor(12));
       this.btnFerramentas.addActionListener(var1x -> var7.show(this.btnFerramentas, 0, this.btnFerramentas.getHeight()));
@@ -289,6 +292,19 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
             );
          }
       );
+   }
+
+   private void abrirDiagnosticoZsgo() {
+      String var1 = JOptionPane.showInputDialog(this,
+         "Opcional: número ou id de uma fatura para procurar (ex.: FR A/10930 ou 10930).\nDeixe vazio para ver só a lista.", "Diagnóstico do ZSGO",
+         JOptionPane.QUESTION_MESSAGE);
+      if (var1 == null) {
+         return;
+      }
+      this.correrEmBackground(this.btnFerramentas, () -> {
+         String var2 = pt.zsgosync.service.ConferenciaService.diagnostico(new AppConfig("config.properties"), var1);
+         SwingUtilities.invokeLater(() -> pt.zsgosync.ui.DetalheErro.mostrar(this, null, var2));
+      });
    }
 
    private void abrirDescobrirLimite() {
