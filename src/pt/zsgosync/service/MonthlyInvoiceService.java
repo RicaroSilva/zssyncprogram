@@ -268,10 +268,16 @@ public class MonthlyInvoiceService {
                throw new IllegalStateException("Fatura criada (id=" + var67 + ") mas o ZSGO não devolveu pdf_url.");
             }
 
+            etapa = "ZSGO: ler nº da fatura";
+            String numeroFatura = numeroFatura(this.zsgoApi.getSale(var67));
+            if (numeroFatura == null) {
+               throw new IllegalStateException("O ZSGO não devolveu o número da fatura id=" + var67 + ".");
+            }
+
             etapa = "Cyclos: enviar PDF";
             notaErro = " (A fatura já existe no ZSGO, id=" + var67 + " — na próxima execução só se repete o envio ao Cyclos.)";
             long var68 = System.nanoTime();
-            this.cyclosClient.notificarFatura(var1, var29);
+            this.cyclosClient.notificarFatura(var1, var29, numeroFatura);
             var21 = (System.nanoTime() - var68) / 1000000L;
             var10.addAndGet(var21);
             etapa = "BD: marcar como sincronizada";
@@ -430,5 +436,16 @@ public class MonthlyInvoiceService {
          var1.append("\"");
          return var1.toString();
       }
+   }
+
+   /** Nº da fatura para o Cyclos: tipo-número, ex. "FA-1231". */
+   private static String numeroFatura(ZsgoDocumento d) {
+      if (d == null) {
+         return null;
+      }
+      if (d.numeroSimples != null && !d.numeroSimples.isBlank()) {
+         return (d.tipo != null && !d.tipo.isBlank() ? d.tipo.toUpperCase() + "-" : "") + d.numeroSimples;
+      }
+      return d.numero;
    }
 }

@@ -23,9 +23,10 @@ public class CyclosInvoiceClient {
       this.http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10L)).build();
    }
 
-   public void notificarFatura(String var1, String var2) throws IOException, InterruptedException {
-      String var3 = var2.replace("\\", "\\\\").replace("\"", "\\\"");
-      String var4 = "{\"url_pdf\":\"" + var3 + "\",\"userid\":" + Long.parseLong(var1) + "}";
+   public void notificarFatura(String var1, String var2, String numeroFatura) throws IOException, InterruptedException {
+      String var3 = escapar(var2);
+      String var4 = "{\"url_pdf\":\"" + var3 + "\",\"userid\":" + Long.parseLong(var1)
+         + ",\"invoicenumber\":\"" + escapar(numeroFatura) + "\"}";
       HttpRequest var5 = HttpRequest.newBuilder()
          .uri(URI.create(this.url))
          .timeout(Duration.ofSeconds(20L))
@@ -38,5 +39,9 @@ public class CyclosInvoiceClient {
       if (var7 < 200 || var7 >= 300) {
          throw new IOException("Cyclos /web/run/invoice devolveu " + var7 + ": " + (String)var6.body());
       }
+   }
+
+   private static String escapar(String s) {
+      return s == null ? "" : s.replace("\\", "\\\\").replace("\"", "\\\"");
    }
 }

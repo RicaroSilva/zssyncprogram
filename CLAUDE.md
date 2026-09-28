@@ -26,6 +26,8 @@ normais). Ver README.md para a estrutura.
   nas NC (por fazer: o utilizador pediu para não mexer nisto por agora).
 - Bug do ZSGO: `billing.exemption_code` ao criar cliente dá HTTP 500
   (reportado); o código continua a enviar.
+- Cyclos (`/web/run/invoice`) recebe `url_pdf`, `userid` e `invoicenumber`
+  (tipo-número do ZSGO, ex. "FA-1231", lido com GET /sales/{id} antes do envio).
 - Tentativas ilimitadas; erros gravados completos (`util/Erros.descrever`).
 - Região fiscal (`address.region_code`) vem do código postal
   (`util/RegiaoFiscal`): 9000–9499 MA, 9500–9999 AC, resto CON. "Verificar
