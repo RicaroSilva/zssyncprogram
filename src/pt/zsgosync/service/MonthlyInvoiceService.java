@@ -213,9 +213,6 @@ public class MonthlyInvoiceService {
                if (doc.pdfUrl != null) {
                   this.invoiceDao.marcarPdfGerado(var64, var1, var2, var4, var5, doc.pdfUrl);
                }
-               if (doc.numero != null) {
-                  this.invoiceDao.guardarNumero(var64, var1, var2, var4, var5, doc.numero);
-               }
                this.invoiceDao.marcarIncerto(var64, var1, var2, var4, var5, false);
                this.lineDetailDao.inserirLinhas(var64, var1, var2, var4, var5, var3);
                LOG.info("Fatura " + var16 + ": já existia no ZSGO (" + loc.motivo + ") — associada, não foi criada outra.");
@@ -239,7 +236,6 @@ public class MonthlyInvoiceService {
          if (var33 != null && !var33.isBlank()) {
             String var67 = var32 != null ? var32.zsgoSaleId : null;
             String var29 = var32 != null ? var32.pdfUrl : null;
-            String numeroFatura = var32 != null ? var32.zsgoNumero : null;
             if (var67 == null) {
                String var36 = this.buildSalePayload(var33, var3, var4, var5);
                BigDecimal var37 = somaLinhas(var3);
@@ -250,14 +246,10 @@ public class MonthlyInvoiceService {
                var9.addAndGet(var19);
                var67 = var38.id;
                var29 = var38.pdfUrl;
-               numeroFatura = var38.numero;
                etapa = "BD: gravar fatura criada";
                notaErro = " (A fatura já foi criada no ZSGO, id=" + var67 + ".)";
                long var39 = System.nanoTime();
                this.invoiceDao.marcarFaturaCriada(var64, var1, var2, var4, var5, var67, var37);
-               if (numeroFatura != null) {
-                  this.invoiceDao.guardarNumero(var64, var1, var2, var4, var5, numeroFatura);
-               }
                if (var29 != null) {
                   this.invoiceDao.marcarPdfGerado(var64, var1, var2, var4, var5, var29);
                }
@@ -276,22 +268,10 @@ public class MonthlyInvoiceService {
                throw new IllegalStateException("Fatura criada (id=" + var67 + ") mas o ZSGO não devolveu pdf_url.");
             }
 
-            if (numeroFatura == null) {
-               // Nome da fatura para o link no Cyclos (ex.: "FR API-FR/11385").
-               try {
-                  numeroFatura = this.zsgoApi.getSale(var67).numero;
-                  if (numeroFatura != null) {
-                     this.invoiceDao.guardarNumero(var64, var1, var2, var4, var5, numeroFatura);
-                  }
-               } catch (Exception e) {
-                  // sem nome: o Cyclos mostra um texto genérico
-               }
-            }
-
             etapa = "Cyclos: enviar PDF";
             notaErro = " (A fatura já existe no ZSGO, id=" + var67 + " — na próxima execução só se repete o envio ao Cyclos.)";
             long var68 = System.nanoTime();
-            this.cyclosClient.notificarFatura(var1, var29, var4, var5, var67, var32 != null ? var32.substituiSaleId : null, numeroFatura);
+            this.cyclosClient.notificarFatura(var1, var29, var4, var5, var67, var32 != null ? var32.substituiSaleId : null);
             var21 = (System.nanoTime() - var68) / 1000000L;
             var10.addAndGet(var21);
             etapa = "BD: marcar como sincronizada";

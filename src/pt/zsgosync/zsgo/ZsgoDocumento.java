@@ -119,9 +119,7 @@ public class ZsgoDocumento {
       d.serie = texto(doc, "series", "serie");
       d.numeroSimples = texto(doc, "number", "document_number");
       d.numero = texto(doc, "label", "full_number");
-      if (d.numero == null && d.numeroSimples != null && d.numeroSimples.matches(".*[/ ].*")) {
-         d.numero = d.numeroSimples; // já vem completo (ex.: "FR A/183")
-      } else if (d.numero == null && d.numeroSimples != null) {
+      if (d.numero == null && d.numeroSimples != null) {
          d.numero = (d.tipo != null ? d.tipo + " " : "") + (d.serie != null ? d.serie + "/" : "") + d.numeroSimples;
       }
       d.estado = texto(m, "status", "state");

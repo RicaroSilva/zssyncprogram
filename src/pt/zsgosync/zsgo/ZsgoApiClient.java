@@ -184,13 +184,7 @@ public class ZsgoApiClient {
          } else {
             String var6 = firstMatch(PDF_URL_PATTERN, (String)var3.body());
             String var7 = var6 != null ? var6.replace("\\/", "/") : null;
-            String numero = null;
-            try {
-               numero = ZsgoDocumento.ler((String)var3.body()).numero;
-            } catch (Exception e) {
-               // sem número na resposta: é pedido mais tarde, se for preciso
-            }
-            return new ZsgoApiClient.SaleResult(var5, var7, numero);
+            return new ZsgoApiClient.SaleResult(var5, var7);
          }
       }
    }
@@ -651,17 +645,10 @@ public class ZsgoApiClient {
    public static class SaleResult {
       public final String id;
       public final String pdfUrl;
-      /** Nome do documento (ex.: "FR API-FR/11385"), se o ZSGO o devolver. */
-      public final String numero;
 
       public SaleResult(String var1, String var2) {
-         this(var1, var2, null);
-      }
-
-      public SaleResult(String id, String pdfUrl, String numero) {
-         this.id = id;
-         this.pdfUrl = pdfUrl;
-         this.numero = numero;
+         this.id = var1;
+         this.pdfUrl = var2;
       }
    }
 }
