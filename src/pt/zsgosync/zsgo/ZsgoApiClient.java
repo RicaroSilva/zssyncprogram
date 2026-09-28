@@ -217,9 +217,14 @@ public class ZsgoApiClient {
 
    /** Procura documentos de venda (GET /sales?search=...). */
    public List<ZsgoDocumento> procurarSales(String texto) throws ZsgoApiException {
-      String q = java.net.URLEncoder.encode(texto, java.nio.charset.StandardCharsets.UTF_8);
+      return this.listarSales(1, 20, texto).documentos;
+   }
+
+   /** Uma página da lista de documentos de venda (GET /sales). */
+   public ZsgoDocumento.Pagina listarSales(int pagina, int porPagina, String procura) throws ZsgoApiException {
+      String q = procura == null ? "" : "&search=" + java.net.URLEncoder.encode(procura, java.nio.charset.StandardCharsets.UTF_8);
       HttpRequest pedido = HttpRequest.newBuilder()
-         .uri(URI.create(this.baseUrl + "/sales?per_page=20&search=" + q))
+         .uri(URI.create(this.baseUrl + "/sales?page=" + pagina + "&per_page=" + porPagina + q))
          .timeout(Duration.ofSeconds(30L))
          .header("Authorization", "Bearer " + this.token)
          .header("Accept", "application/json")
@@ -231,7 +236,7 @@ public class ZsgoApiClient {
          throw new ZsgoApiException("GET /sales?search devolveu " + resposta.statusCode() + ": " + (msg != null ? msg : resposta.body()), resposta.statusCode());
       }
       try {
-         return ZsgoDocumento.lerLista(resposta.body());
+         return ZsgoDocumento.lerPagina(resposta.body());
       } catch (IllegalArgumentException e) {
          throw new ZsgoApiException("Resposta do ZSGO em formato inesperado: " + resposta.body(), resposta.statusCode());
       }

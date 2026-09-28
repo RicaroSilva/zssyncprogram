@@ -878,6 +878,8 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
          b.append("  Ainda não conferido — carrega em \"Ler do ZSGO agora\".\n");
       } else if (f.incerto) {
          b.append("  PODE EXISTIR: o ZSGO não respondeu quando esta fatura foi pedida, por isso não se sabe se foi criada.\n");
+         b.append("  Em cada \"Gerar faturas em falta\" o programa tenta confirmar sozinho no ZSGO (pela referência\n");
+         b.append("  da fatura, ou pelo cliente e valor). Não conseguiu — o motivo está no ERRO acima.\n");
          b.append("  Procure no ZSGO as faturas deste cliente neste mês e depois use um dos botões:\n");
          b.append("   • \"Existe no ZSGO — indicar o nº\": associa a fatura que lá está (não cria outra);\n");
          b.append("   • \"Não existe — criar outra vez\": a próxima faturação volta a criá-la.\n");

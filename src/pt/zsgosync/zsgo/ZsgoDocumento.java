@@ -28,6 +28,9 @@ public class ZsgoDocumento {
    public final List<Linha> linhas = new ArrayList<>();
    public String json;
    public String pdfUrl;
+   /** Referência externa (document.reference) que o programa põe em cada fatura. */
+   public String referencia;
+   public String clienteCodigo;
 
    public static class Linha {
       public String id;
@@ -53,6 +56,28 @@ public class ZsgoDocumento {
       }
       preencher(d, (Map<String, Object>) dados);
       return d;
+   }
+
+   /** Uma página de GET /sales: os documentos e o número total de páginas (se o ZSGO o indicar). */
+   public static class Pagina {
+      public final List<ZsgoDocumento> documentos;
+      public final Integer totalPaginas;
+
+      Pagina(List<ZsgoDocumento> documentos, Integer totalPaginas) {
+         this.documentos = documentos;
+         this.totalPaginas = totalPaginas;
+      }
+   }
+
+   @SuppressWarnings("unchecked")
+   public static Pagina lerPagina(String json) {
+      List<ZsgoDocumento> docs = lerLista(json);
+      Object meta = Json.caminho(Json.ler(json), "meta");
+      Integer paginas = null;
+      if (meta instanceof Map && ((Map<String, Object>) meta).get("page_count") instanceof Number) {
+         paginas = ((Number) ((Map<String, Object>) meta).get("page_count")).intValue();
+      }
+      return new Pagina(docs, paginas);
    }
 
    /** Lista de documentos (resposta de GET /sales): cada elemento de "data". */
@@ -88,6 +113,12 @@ public class ZsgoDocumento {
       d.estado = texto(doc, "status", "state");
       d.data = texto(doc, "date", "document_date", "issued_at", "created_at");
       d.pdfUrl = texto(m, "pdf_url", "pdf");
+      d.referencia = texto(doc, "reference", "external_reference", "your_reference");
+      if (d.referencia == null && doc != m) {
+         d.referencia = texto(m, "reference", "external_reference");
+      }
+      Object cli = m.get("customer") != null ? m.get("customer") : doc.get("customer");
+      d.clienteCodigo = cli instanceof Map ? texto((Map<String, Object>) cli, "code", "customer_code") : texto(m, "customer_code", "client_code");
       d.total = numero(totais, "total", "gross_total", "total_gross", "grand_total", "total_amount", "document_total", "total_with_tax");
       d.liquido = numero(totais, "net_total", "total_net", "subtotal", "total_without_tax", "net", "total_liquid");
       d.iva = numero(totais, "tax_total", "total_tax", "vat_total", "total_vat", "tax", "taxes", "vat");

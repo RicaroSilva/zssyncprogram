@@ -35,8 +35,12 @@ normais). Ver README.md para a estrutura.
   /sales, POST /clients) quando o pedido pode ter chegado e não houve
   resposta: isso criava faturas em duplicado (setembro 2026). Nesses casos
   lança-se `ZsgoResultadoIncertoException`, a fatura fica com
-  `zsgo_incerto = true` e só volta a ser criada depois de alguém confirmar
-  no painel (associar o nº existente ou autorizar recriar).
+  `zsgo_incerto = true`. Na geração seguinte `LocalizadorFaturas` procura-a
+  no ZSGO: pela referência (`document.reference` = `LP-cliente-origem-AAAAMM`,
+  enviada em todas as faturas) e, para as antigas, pelo cliente + valor na
+  lista `GET /sales` (lida uma vez por execução). Só cria se tiver a certeza
+  de que não existe (nenhuma fatura do cliente depois do fim do mês);
+  qualquer dúvida → fica para confirmar no painel (associar o nº ou recriar).
 
 ## Por fazer / pedidos em espera
 

@@ -25,6 +25,7 @@ import pt.zsgosync.model.BillingLine;
 import pt.zsgosync.progress.ProgressListener;
 import pt.zsgosync.util.Erros;
 import pt.zsgosync.zsgo.ZsgoApiClient;
+import pt.zsgosync.zsgo.ZsgoDocumento;
 
 public class MonthlyInvoiceService {
    private static final Logger LOG = Logger.getLogger(MonthlyInvoiceService.class.getName());
@@ -44,6 +45,8 @@ public class MonthlyInvoiceService {
    private final int threads;
    private final Object lockValorTotal = new Object();
    private BigDecimal valorTotalFaturado = BigDecimal.ZERO;
+   /** Procura no ZSGO as faturas "Verificar no ZSGO" (uma leitura da lista por execução). */
+   private LocalizadorFaturas localizador;
 
    public MonthlyInvoiceService(
       BillingSourceDao var1,
@@ -82,6 +85,7 @@ public class MonthlyInvoiceService {
    public void runOnce(Connection var1, int var2, int var3, ProgressListener var4) throws SQLException {
       this.invoiceDao.ensureTableExists(var1);
       this.lineDetailDao.ensureTableExists(var1);
+      this.localizador = new LocalizadorFaturas(this.zsgoApi);
       List<BillingLine> var7 = this.billingDao.fetchLines(var1, var2, var3);
       LOG.info("Encontradas " + var7.size() + " linhas de faturação para " + var3 + "/" + var2 + ".");
       LinkedHashMap<String, List<BillingLine>> var8 = new LinkedHashMap<>();
@@ -197,14 +201,35 @@ public class MonthlyInvoiceService {
 
          if (var32 != null && var32.incerto && var32.zsgoSaleId == null) {
             // Da última vez o ZSGO não respondeu: a fatura pode já existir lá.
-            // Não se cria outra vez sem alguém confirmar no painel.
-            String msg = "[Verificar no ZSGO] Da última vez o ZSGO não respondeu ao criar esta fatura: pode já existir. "
-               + "Confirme no ZSGO e, no painel (duplo-clique na fatura), indique o número da fatura existente ou autorize criar outra vez.";
-            this.invoiceDao.marcarErro(var64, var1, var2, var4, var5, msg);
-            var8.incrementAndGet();
-            var25 = "erro(incerto)";
-            var15.aoItemFalhar(var16, msg);
-            return;
+            // Vai ver sozinho ao ZSGO; só avança se tiver a certeza.
+            etapa = "ZSGO: verificar se a fatura já existe";
+            BillingLine primeira = (BillingLine)var3.get(0);
+            LocalizadorFaturas.Resultado loc = this.localizador.localizar(
+               LocalizadorFaturas.referencia(var1, var2, var4, var5), primeira.zsgoCode, somaLinhas(var3), var4, var5
+            );
+            if (loc.tipo == LocalizadorFaturas.Tipo.ENCONTRADA) {
+               ZsgoDocumento doc = loc.documento;
+               this.invoiceDao.marcarFaturaCriada(var64, var1, var2, var4, var5, doc.id, somaLinhas(var3));
+               if (doc.pdfUrl != null) {
+                  this.invoiceDao.marcarPdfGerado(var64, var1, var2, var4, var5, doc.pdfUrl);
+               }
+               this.invoiceDao.marcarIncerto(var64, var1, var2, var4, var5, false);
+               this.lineDetailDao.inserirLinhas(var64, var1, var2, var4, var5, var3);
+               LOG.info("Fatura " + var16 + ": já existia no ZSGO (" + loc.motivo + ") — associada, não foi criada outra.");
+               var32 = this.invoiceDao.getEstado(var64, var1, var2, var4, var5);
+            } else if (loc.tipo == LocalizadorFaturas.Tipo.NAO_EXISTE) {
+               this.invoiceDao.marcarIncerto(var64, var1, var2, var4, var5, false);
+               LOG.info("Fatura " + var16 + ": confirmado que não existe no ZSGO (" + loc.motivo + ") — vai ser criada.");
+               var32 = this.invoiceDao.getEstado(var64, var1, var2, var4, var5);
+            } else {
+               String msg = "[Verificar no ZSGO] Da última vez o ZSGO não respondeu ao criar esta fatura e não foi possível confirmar sozinho se existe ("
+                  + loc.motivo + "). Confirme no ZSGO e, no painel (duplo-clique na fatura), indique o número da fatura existente ou autorize criar outra vez.";
+               this.invoiceDao.marcarErro(var64, var1, var2, var4, var5, msg);
+               var8.incrementAndGet();
+               var25 = "erro(incerto)";
+               var15.aoItemFalhar(var16, msg);
+               return;
+            }
          }
 
          String var33 = ((BillingLine)var3.get(0)).zsgoCode;
@@ -348,6 +373,11 @@ public class MonthlyInvoiceService {
          var10.append(",\"payment_method_id\":").append(jsonString(this.paymentMethodId));
       }
 
+      // Referência única (cliente, origem, mês): permite encontrar a fatura no
+      // ZSGO se o pedido ficar sem resposta, sem risco de a criar duas vezes.
+      BillingLine primeiraLinha = (BillingLine)var2.get(0);
+      var10.append(",\"reference\":").append(jsonString(LocalizadorFaturas.referencia(
+         primeiraLinha.clienteId, primeiraLinha.contaOrigemId != null ? primeiraLinha.contaOrigemId : primeiraLinha.clienteId, var3, var4)));
       var10.append(",\"tax_included\":true");
       var10.append(",\"auto_confirm\":true");
       BillingLine var11 = (BillingLine)var2.get(0);
