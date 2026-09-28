@@ -43,6 +43,7 @@ public class MonthlyInvoiceRun {
    }
 
    public static void run(AppConfig var0, int var1, int var2, ProgressListener var3, ProgressListener var4) throws Exception {
+      pt.zsgosync.zsgo.ZsgoDocumento.configurarCodigosAnulado(var0.getOrDefault("zsgo.status.anulado", ""));
       RateLimiter var5 = new RateLimiter(var0.getInt("invoice.rateLimit.requestsPerWindow", 25), var0.getInt("invoice.rateLimit.windowMillis", 60000));
       ZsgoApiClient var6 = new ZsgoApiClient(
             var0.get("zsgo.baseUrl"),

@@ -268,6 +268,11 @@ cyclos.invoice.user=o_teu_user_cyclos
 cyclos.invoice.password=a_tua_password_cyclos
 
 invoice.document.type=FR
+
+# Código(s) do "status" com que o ZSGO marca um documento ANULADO (a API usa
+# números: 5 = fechado/por pagar, 7 = pago). Faturas anuladas são ignoradas
+# quando o programa procura no ZSGO se uma fatura já existe. Vários: 8,9
+zsgo.status.anulado=
 invoice.document.series=A
 invoice.maxAttempts=-1
 

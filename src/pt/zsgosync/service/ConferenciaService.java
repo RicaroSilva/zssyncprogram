@@ -155,6 +155,7 @@ public class ConferenciaService {
    }
 
    private static ZsgoApiClient criarCliente(AppConfig cfg) {
+      ZsgoDocumento.configurarCodigosAnulado(cfg.getOrDefault("zsgo.status.anulado", ""));
       RateLimiter limite = new RateLimiter(cfg.getInt("invoice.rateLimit.requestsPerWindow", 25), cfg.getInt("invoice.rateLimit.windowMillis", 60000));
       return new ZsgoApiClient(
             cfg.get("zsgo.baseUrl"),

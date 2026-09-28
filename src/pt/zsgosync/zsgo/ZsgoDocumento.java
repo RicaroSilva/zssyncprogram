@@ -110,7 +110,8 @@ public class ZsgoDocumento {
       Map<String, Object> totais = m.get("totals") instanceof Map ? (Map<String, Object>) m.get("totals") : m;
 
       d.id = texto(m, "id");
-      d.numero = texto(doc, "number", "document_number", "full_number", "reference", "name");
+      // O ZSGO devolve o número completo em "label" (ex.: "FR A/1001"); "number" é só o 1001.
+      d.numero = texto(doc, "label", "full_number", "document_number", "number", "name");
       d.tipo = texto(doc, "type", "document_type");
       d.estado = texto(doc, "status", "state");
       d.data = texto(doc, "date", "document_date", "issued_at", "created_at");
@@ -129,7 +130,9 @@ public class ZsgoDocumento {
       d.liquido = numero(totais, "net_total", "total_net", "subtotal", "total_without_tax", "net", "total_liquid");
       d.iva = numero(totais, "tax_total", "total_tax", "vat_total", "total_vat", "tax", "taxes", "vat");
       Object anulado = primeiro(doc, "annulled", "is_annulled", "canceled", "cancelled");
-      d.anulado = Boolean.TRUE.equals(anulado) || (d.estado != null && d.estado.toLowerCase().matches(".*(anul|annul|cancel).*"));
+      d.anulado = Boolean.TRUE.equals(anulado) || (d.estado != null && d.estado.toLowerCase().matches(".*(anul|annul|cancel).*"))
+         || (d.estado != null && CODIGOS_ANULADO.contains(d.estado.trim()))
+         || temMarcaDeAnulacao(doc) || (doc != m && temMarcaDeAnulacao(m));
 
       Object itens = primeiro(m, "items", "lines", "document_lines");
       if (itens instanceof List) {
@@ -163,6 +166,44 @@ public class ZsgoDocumento {
       if (d.total == null && d.liquido != null && d.iva != null) {
          d.total = d.liquido.add(d.iva);
       }
+   }
+
+   /**
+    * Códigos numéricos de "status" que o ZSGO usa para documentos anulados
+    * (a documentação só diz 5 = fechado/por pagar e 7 = pago). Configurável
+    * em config.properties: zsgo.status.anulado=9  (vários: 8,9).
+    */
+   private static volatile java.util.Set<String> CODIGOS_ANULADO = java.util.Set.of();
+
+   public static void configurarCodigosAnulado(String valor) {
+      java.util.Set<String> s = new java.util.HashSet<>();
+      if (valor != null) {
+         for (String p : valor.split("[,; ]+")) {
+            if (!p.isBlank()) {
+               s.add(p.trim());
+            }
+         }
+      }
+      CODIGOS_ANULADO = s;
+   }
+
+   /** Campos como annulled_at, cancellation_reason, annul_reason preenchidos = documento anulado. */
+   private static boolean temMarcaDeAnulacao(Map<String, Object> m) {
+      for (Map.Entry<String, Object> e : m.entrySet()) {
+         String k = e.getKey().toLowerCase(java.util.Locale.ROOT);
+         if (!(k.contains("annul") || k.contains("anul") || k.contains("cancel") || k.contains("void"))) {
+            continue;
+         }
+         Object v = e.getValue();
+         if (v == null || Boolean.FALSE.equals(v) || "".equals(v) || (v instanceof Number && ((Number) v).doubleValue() == 0)) {
+            continue;
+         }
+         if (v instanceof String && ((String) v).matches("(?i)false|0|no|n")) {
+            continue;
+         }
+         return true;
+      }
+      return false;
    }
 
    private static Object primeiro(Map<String, Object> m, String... chaves) {
