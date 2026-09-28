@@ -27,6 +27,10 @@ normais). Ver README.md para a estrutura.
 - Bug do ZSGO: `billing.exemption_code` ao criar cliente dá HTTP 500
   (reportado); o código continua a enviar.
 - Tentativas ilimitadas; erros gravados completos (`util/Erros.descrever`).
+- Região fiscal (`address.region_code`) vem do código postal
+  (`util/RegiaoFiscal`): 9000–9499 MA, 9500–9999 AC, resto CON. "Verificar
+  alterações" também marca como desatualizados os clientes cuja região no
+  ZSGO não bate com o código postal (os antigos foram criados sem região).
 - NUNCA repetir automaticamente pedidos que criam coisas no ZSGO (POST
   /sales, POST /clients) quando o pedido pode ter chegado e não houve
   resposta: isso criava faturas em duplicado (setembro 2026). Nesses casos

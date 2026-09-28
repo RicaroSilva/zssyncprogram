@@ -32,13 +32,27 @@ public class ClientVerifyService {
       for (ClientListingDao.ClienteResumo var7 : var2) {
          if ("SINCRONIZADO".equals(var7.status) && var7.zsgoCode != null) {
             SourceClient var8 = (SourceClient)var4.get(var7.sourceId);
-            if (var8 != null && var8.contentHash != null && !var8.contentHash.equals(var7.contentHash)) {
+            if (var8 != null && (var8.contentHash != null && !var8.contentHash.equals(var7.contentHash) || regiaoErrada(var7, var8))) {
                var9.add(new ClientVerifyService.ClienteDesatualizado(var7.sourceId, var7.zsgoCode, var8, var7.nome, var7.email, var7.morada));
             }
          }
       }
 
       return var9;
+   }
+
+   /**
+    * O cliente está no ZSGO com uma região fiscal diferente da do seu código
+    * postal (ex.: criado como Continente mas é da Madeira). Clientes antigos
+    * foram todos criados sem região, ou seja, como Continente.
+    */
+   static boolean regiaoErrada(ClientListingDao.ClienteResumo noZsgo, SourceClient atual) {
+      String certa = pt.zsgosync.util.RegiaoFiscal.deCodigoPostal(atual.pais, atual.codigoPostal);
+      if (certa == null) {
+         return false;
+      }
+      String gravada = noZsgo.regionCode == null || noZsgo.regionCode.isBlank() ? pt.zsgosync.util.RegiaoFiscal.CONTINENTE : noZsgo.regionCode;
+      return !certa.equalsIgnoreCase(gravada);
    }
 
    public static class ClienteDesatualizado {

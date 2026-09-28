@@ -247,6 +247,10 @@ public class PainelClientes extends JPanel implements Tema.TemaOuvinte {
 
    private static String localidade(ClientListingDao.ClienteResumo c) {
       String cidade = nvl(c.cidade);
+      String regiao = pt.zsgosync.util.RegiaoFiscal.deCodigoPostal(c.pais, c.codigoPostal);
+      if (pt.zsgosync.util.RegiaoFiscal.MADEIRA.equals(regiao) || pt.zsgosync.util.RegiaoFiscal.ACORES.equals(regiao)) {
+         cidade = (cidade.isEmpty() ? "" : cidade + " · ") + pt.zsgosync.util.RegiaoFiscal.nome(regiao);
+      }
       return c.pais != null && !"PT".equalsIgnoreCase(c.pais) ? (cidade.isEmpty() ? c.pais : cidade + " (" + c.pais + ")") : cidade;
    }
 
@@ -296,7 +300,10 @@ public class PainelClientes extends JPanel implements Tema.TemaOuvinte {
       b.append("  Email: ").append(nvl(c.email)).append('\n');
       b.append("  Morada: ").append(nvl(c.morada)).append('\n');
       b.append("  Código postal: ").append(nvl(c.codigoPostal)).append("   Cidade: ").append(nvl(c.cidade)).append('\n');
-      b.append("  País: ").append(nvl(c.pais)).append("   Região fiscal: ").append(nvl(c.regionCode)).append('\n');
+      String regiaoCerta = pt.zsgosync.util.RegiaoFiscal.deCodigoPostal(c.pais, c.codigoPostal);
+      b.append("  País: ").append(nvl(c.pais)).append("   Região fiscal no ZSGO: ")
+         .append(c.regionCode != null && !c.regionCode.isBlank() ? pt.zsgosync.util.RegiaoFiscal.nome(c.regionCode) : "não indicada (o ZSGO assume Continente)")
+         .append("   Pelo código postal: ").append(pt.zsgosync.util.RegiaoFiscal.nome(regiaoCerta)).append('\n');
       b.append("  IVA: ").append(c.exemptionCode != null && !c.exemptionCode.isBlank() ? "isento, código " + c.exemptionCode : "normal").append('\n');
       if (this.desatualizados.contains(c.sourceId)) {
          b.append("\nOs dados deste cliente no Cyclos mudaram desde que foi enviado ao ZSGO.\nUsa \"Verificar alterações\" para os reenviar.\n");

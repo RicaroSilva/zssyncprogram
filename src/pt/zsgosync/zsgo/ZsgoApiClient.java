@@ -402,6 +402,13 @@ public class ZsgoApiClient {
          var3.append(",\"city\":").append(jsonString(var1.cidade));
       }
 
+      // Região fiscal (Continente / Madeira / Açores) pelo código postal: sem
+      // isto o ZSGO assume sempre o Continente e aplica o IVA errado.
+      String regiao = pt.zsgosync.util.RegiaoFiscal.deCodigoPostal(var1.pais, var1.codigoPostal);
+      if (regiao != null) {
+         var3.append(",\"region_code\":").append(jsonString(regiao));
+      }
+
       var3.append("}");
       StringBuilder var4 = new StringBuilder("{");
       var4.append("\"price_line\":").append(Integer.parseInt(this.defaultPriceLine));
