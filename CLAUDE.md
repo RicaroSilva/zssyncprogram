@@ -28,6 +28,10 @@ normais). Ver README.md para a estrutura.
   (reportado); o código continua a enviar.
 - Cyclos (`/web/run/invoice`) recebe `url_pdf`, `userid` e `invoicenumber`
   (tipo-número do ZSGO, ex. "FA-1231", lido com GET /sales/{id} antes do envio).
+- "Gerar faturas em falta" abre `ui/DialogoPassosFaturacao` e faz por ordem:
+  pré-análise → criar clientes em falta → verificar alterações → atualizar
+  clientes → resumo/confirmação → emitir. A tarefa agendada de faturação
+  mensal faz os mesmos passos (sem janela).
 - Tentativas ilimitadas; erros gravados completos (`util/Erros.descrever`).
 - Região fiscal (`address.region_code`) vem do código postal
   (`util/RegiaoFiscal`): 9000–9499 MA, 9500–9999 AC, resto CON. "Verificar

@@ -50,7 +50,9 @@ import pt.zsgosync.service.ClientVerifyService;
 import pt.zsgosync.service.DashboardService;
 import pt.zsgosync.service.FaturacaoPreviewService;
 import pt.zsgosync.service.RelatorioService;
+import pt.zsgosync.ui.DialogoPassosFaturacao;
 import pt.zsgosync.ui.PainelClientes;
+import pt.zsgosync.util.Erros;
 import pt.zsgosync.ui.PainelDescobrirLimite;
 import pt.zsgosync.ui.PainelExecucao;
 import pt.zsgosync.ui.PainelFaturacao;
@@ -388,132 +390,193 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
       return this.painelFaturacao;
    }
 
-   private void iniciarFaturacaoComResumo(int var1, int var2) {
+   private static final String[] PASSOS_FATURACAO = {
+      "Pré-análise do mês",
+      "Criar no ZSGO os clientes que ainda não existem",
+      "Verificar se algum cliente mudou de dados no Cyclos",
+      "Atualizar no ZSGO os clientes com dados alterados",
+      "Resumo e confirmação",
+      "Emitir faturas e notas de crédito"
+   };
+
+   /**
+    * Gerar a faturação do mês: faz tudo por ordem numa janela de passos —
+    * pré-análise, cria os clientes em falta, atualiza os clientes que mudaram
+    * de dados, mostra o resumo e, depois de confirmado, emite.
+    */
+   private void iniciarFaturacaoComResumo(int ano, int mes) {
       this.btnFaturar.setEnabled(false);
-      String var3 = this.btnFaturar.getText();
-      this.btnFaturar.setText("A calcular resumo...");
-      StatusListener var4 = this.criarStatusListenerFaturacao();
-      var4.aoAtualizarEstado("A ligar à base de dados...", -1, -1);
-      new Thread(
-            () -> {
-               try {
-                  AppConfig var5 = new AppConfig("config.properties");
-                  var4.aoAtualizarEstado("A calcular quantos clientes/notas de crédito vão ser processados (pode demorar um pouco)...", -1, -1);
-                  FaturacaoPreviewService.Preview var6 = FaturacaoPreviewRun.obter(var5, var1, var2);
-                  var4.aoAtualizarEstado(
-                     "Resumo pronto — " + var6.clientesAFaturar + " cliente(s) a faturar, " + var6.notasCreditoAEmitir + " nota(s) de crédito.", 1, 1
-                  );
-                  SwingUtilities.invokeLater(() -> {
-                     this.btnFaturar.setText(var3);
-                     if (!var6.idsSemZsgoCode.isEmpty()) {
-                        this.oferecerSincronizarSemZsgoCode(var5, var1, var2, var6);
-                     } else {
-                        this.continuarComResumoOuFaturar(var5, var1, var2, var6);
-                     }
-                  });
-               } catch (Exception var7) {
-                  var4.aoAtualizarEstado("Falhou: " + var7.getMessage(), 0, 1);
-                  SwingUtilities.invokeLater(() -> {
-                     this.btnFaturar.setEnabled(true);
-                     this.btnFaturar.setText(var3);
-                     JOptionPane.showMessageDialog(this, "Falha ao calcular o resumo da faturação: " + var7.getMessage(), "Erro", 0);
-                  });
-               }
-            },
-            "preview-faturacao"
-         )
-         .start();
+      String textoBotao = this.btnFaturar.getText();
+      this.btnFaturar.setText("A preparar...");
+      Runnable reativar = () -> SwingUtilities.invokeLater(() -> {
+         this.btnFaturar.setEnabled(true);
+         this.btnFaturar.setText(textoBotao);
+      });
+      String periodo = String.format("%02d/%d", mes, ano);
+      DialogoPassosFaturacao dlg = new DialogoPassosFaturacao(this, "Gerar faturação de " + periodo, PASSOS_FATURACAO);
+      dlg.setVisible(true);
+      StatusListener painel = this.criarStatusListenerFaturacao();
+      NumberFormat moeda = NumberFormat.getCurrencyInstance(new Locale("pt", "PT"));
+      new Thread(() -> {
+         int passo = 0;
+         try {
+            AppConfig cfg = new AppConfig("config.properties");
+
+            // 1. Pré-análise
+            dlg.iniciar(0, "A calcular quantos clientes e notas de crédito vão ser processados...");
+            painel.aoAtualizarEstado("A preparar a faturação de " + periodo + "...", -1, -1);
+            FaturacaoPreviewService.Preview p = FaturacaoPreviewRun.obter(cfg, ano, mes);
+            dlg.concluir(0, DialogoPassosFaturacao.Estado.OK,
+               p.clientesAFaturar + " cliente(s) a faturar (" + moeda.format(p.valorAFaturar) + "), "
+                  + p.clientesJaFaturados + " já faturado(s), " + p.notasCreditoAEmitir + " nota(s) de crédito a emitir"
+                  + (p.idsSemZsgoCode.isEmpty() ? "." : ". " + p.idsSemZsgoCode.size() + " cliente(s) ainda não existem no ZSGO (são criados no passo 2 e entram na fatura)."));
+
+            boolean mudouAlgo = false;
+
+            // 2. Criar clientes em falta
+            passo = 1;
+            if (p.idsSemZsgoCode.isEmpty()) {
+               dlg.concluir(1, DialogoPassosFaturacao.Estado.OK, "Todos os clientes a faturar já existem no ZSGO.");
+            } else {
+               dlg.iniciar(1, "A criar " + p.idsSemZsgoCode.size() + " cliente(s) no ZSGO...");
+               int[] r = ClientListingRun.sincronizarEspecificos(cfg, p.idsSemZsgoCode, dlg.estado(1));
+               mudouAlgo |= r[0] > 0;
+               int naoEncontrados = p.idsSemZsgoCode.size() - r[0] - r[1];
+               HistoricoRun.registar(cfg, this.usuarioAtual.username, "SINCRONIZAR_CLIENTES_SEM_ZSGO_CODE",
+                  r[0] + " criado(s) no ZSGO, " + r[1] + " com erro (antes da faturação de " + periodo + ").");
+               dlg.concluir(1, r[1] > 0 || naoEncontrados > 0 ? DialogoPassosFaturacao.Estado.AVISO : DialogoPassosFaturacao.Estado.OK,
+                  r[0] + " cliente(s) criado(s) no ZSGO"
+                     + (r[1] > 0 ? ", " + r[1] + " com erro (ver no ecrã Clientes)" : "")
+                     + (naoEncontrados > 0 ? ", " + naoEncontrados + " não encontrado(s) na consulta de clientes" : "")
+                     + (r[1] > 0 || naoEncontrados > 0 ? ". Estes clientes vão falhar na faturação." : "."));
+            }
+
+            // 3. Verificar alterações
+            passo = 2;
+            dlg.iniciar(2, "A comparar os dados do Cyclos com os que estão no ZSGO...");
+            List<ClientVerifyService.ClienteDesatualizado> mudaram = null;
+            try {
+               mudaram = ClientListingRun.verificar(cfg, dlg.estado(2));
+               dlg.concluir(2, DialogoPassosFaturacao.Estado.OK, mudaram.isEmpty()
+                  ? "Nenhum cliente com dados alterados."
+                  : mudaram.size() + " cliente(s) com dados diferentes dos que estão no ZSGO.");
+            } catch (Exception e) {
+               dlg.concluir(2, DialogoPassosFaturacao.Estado.AVISO, "Não foi possível verificar: " + Erros.descrever(e)
+                  + " — a faturação continua com os dados que já estão no ZSGO.");
+            }
+
+            // 4. Atualizar clientes
+            passo = 3;
+            if (mudaram == null) {
+               dlg.concluir(3, DialogoPassosFaturacao.Estado.SALTADO, "Saltado (a verificação não correu).");
+            } else if (mudaram.isEmpty()) {
+               dlg.concluir(3, DialogoPassosFaturacao.Estado.OK, "Nada para atualizar.");
+            } else {
+               dlg.iniciar(3, "A atualizar " + mudaram.size() + " cliente(s) no ZSGO...");
+               int[] r = ClientListingRun.aplicarAtualizacoes(cfg, mudaram, dlg.estado(3));
+               mudouAlgo |= r[0] > 0;
+               HistoricoRun.registar(cfg, this.usuarioAtual.username, "ATUALIZAR_CLIENTES",
+                  r[0] + " atualizado(s) no ZSGO, " + r[1] + " com erro (antes da faturação de " + periodo + ").");
+               dlg.concluir(3, r[1] > 0 ? DialogoPassosFaturacao.Estado.AVISO : DialogoPassosFaturacao.Estado.OK,
+                  r[0] + " cliente(s) atualizado(s) no ZSGO"
+                     + (r[1] > 0 ? ", " + r[1] + " com erro (ver no ecrã Clientes) — as faturas destes saem com os dados antigos." : "."));
+            }
+            this.carregarResumo();
+
+            // 5. Resumo
+            passo = 4;
+            if (mudouAlgo) {
+               dlg.iniciar(4, "A recalcular o resumo com os clientes novos/atualizados...");
+               p = FaturacaoPreviewRun.obter(cfg, ano, mes);
+            }
+            FaturacaoPreviewService.Preview fp = p;
+            boolean nada = fp.clientesAFaturar == 0 && fp.notasCreditoAEmitir == 0;
+            dlg.concluir(4, DialogoPassosFaturacao.Estado.A_CORRER, nada ? "Não há nada por faturar." : "Confirme o resumo abaixo.");
+            painel.aoAtualizarEstado("Resumo pronto — " + fp.clientesAFaturar + " cliente(s) a faturar, " + fp.notasCreditoAEmitir + " nota(s) de crédito.", 1, 1);
+            dlg.pedirConfirmacao(this.textoResumoFaturacao(ano, mes, fp), nada ? "Correr na mesma" : "Emitir faturas", () -> {
+               dlg.concluir(4, DialogoPassosFaturacao.Estado.OK, "Confirmado por " + this.usuarioAtual.username + ".");
+               this.executarFaturacaoReal(cfg, ano, mes, fp, dlg, reativar);
+            }, () -> {
+               painel.aoAtualizarEstado("Faturação cancelada.", 0, 1);
+               reativar.run();
+            });
+         } catch (Exception e) {
+            dlg.concluir(passo, DialogoPassosFaturacao.Estado.ERRO, Erros.descrever(e));
+            dlg.terminar("A faturação NÃO foi emitida: falhou o passo " + (passo + 1) + ".\n\n" + Erros.descrever(e));
+            painel.aoAtualizarEstado("Falhou: " + Erros.descrever(e), 0, 1);
+            reativar.run();
+         }
+      }, "preparar-faturacao").start();
    }
 
    private StatusListener criarStatusListenerFaturacao() {
       return (var1, var2, var3) -> SwingUtilities.invokeLater(() -> this.painelFaturacao.mostrarEstado(var1, var2, var3));
    }
 
-   private void oferecerSincronizarSemZsgoCode(AppConfig var1, int var2, int var3, FaturacaoPreviewService.Preview var4) {
-      String[] var5 = new String[]{"Sincronizar agora", "Ignorar por agora", "Cancelar"};
-      StringBuilder var6 = new StringBuilder();
-      var6.append(var4.idsSemZsgoCode.size()).append(" cliente(s) não têm zsgo_code e vão falhar na faturação / notas de crédito");
-      if (!var4.exemplosSemZsgoCode.isEmpty()) {
-         var6.append(" (ex: ").append(String.join(", ", var4.exemplosSemZsgoCode));
-         if (var4.idsSemZsgoCode.size() > var4.exemplosSemZsgoCode.size()) {
-            var6.append(", ...");
-         }
-
-         var6.append(")");
-      }
-
-      var6.append(".\n\nQueres sincronizá-los com o ZSGO agora, antes de continuar?");
-      int var7 = JOptionPane.showOptionDialog(this, var6.toString(), "Clientes sem zsgo_code", 1, 2, null, var5, var5[0]);
-      if (var7 == 2 || var7 == -1) {
-         this.btnFaturar.setEnabled(true);
-      } else if (var7 != 0) {
-         this.continuarComResumoOuFaturar(var1, var2, var3, var4);
-      } else {
-         this.correrEmBackground(
-            this.btnFaturar,
-            () -> {
-               StatusListener var5x = this.criarStatusListenerFaturacao();
-               int[] var6x = ClientListingRun.sincronizarEspecificos(var1, var4.idsSemZsgoCode, var5x);
-               HistoricoRun.registar(
-                  var1,
-                  this.usuarioAtual.username,
-                  "SINCRONIZAR_CLIENTES_SEM_ZSGO_CODE",
-                  var6x[0] + " criado(s) no ZSGO, " + var6x[1] + " com erro (a partir do resumo de faturação)."
-               );
-               this.carregarResumo();
-               FaturacaoPreviewService.Preview var7x = FaturacaoPreviewRun.obter(var1, var2, var3);
-               SwingUtilities.invokeLater(() -> {
-                  this.btnFaturar.setEnabled(true);
-                  JOptionPane.showMessageDialog(this, var6x[0] + " cliente(s) criado(s) no ZSGO, " + var6x[1] + " com erro.", "Sincronização concluída", 1);
-                  this.continuarComResumoOuFaturar(var1, var2, var3, var7x);
-               });
-            }
-         );
-      }
-   }
-
-   private void continuarComResumoOuFaturar(AppConfig var1, int var2, int var3, FaturacaoPreviewService.Preview var4) {
-      boolean var5 = this.mostrarResumoFaturacao(var2, var3, var4);
-      if (var5) {
-         this.executarFaturacaoReal(var1, var2, var3, var4);
-      } else {
-         this.btnFaturar.setEnabled(true);
-      }
-   }
-
-   private void executarFaturacaoReal(AppConfig var1, int var2, int var3, FaturacaoPreviewService.Preview var4) {
-      this.correrEmBackground(
-         this.btnFaturar,
-         () -> {
-            ProgressListener var5 = this.painelFaturacao.criarListener("Faturas");
-            ProgressListener var6 = this.painelFaturacao.criarListener("Notas de crédito");
-            this.painelFaturacao.iniciarAtualizacaoAoVivo();
-            try {
-               MonthlyInvoiceRun.run(var1, var2, var3, var5, var6);
-            } finally {
-               this.painelFaturacao.pararAtualizacaoAoVivo();
-               SwingUtilities.invokeLater(() -> this.painelFaturacao.recarregarMantendoEstado());
-            }
-            HistoricoRun.registar(
-               var1,
-               this.usuarioAtual.username,
-               "GERAR_FATURACAO_MENSAL",
-               "Faturação de "
-                  + var3
-                  + "/"
-                  + var2
-                  + " executada ("
-                  + var4.clientesAFaturar
-                  + " cliente(s), "
-                  + var4.notasCreditoAEmitir
-                  + " nota(s) de crédito previstas)."
-            );
+   private void executarFaturacaoReal(AppConfig cfg, int ano, int mes, FaturacaoPreviewService.Preview p, DialogoPassosFaturacao dlg, Runnable reativar) {
+      NumberFormat moeda = NumberFormat.getCurrencyInstance(new Locale("pt", "PT"));
+      StringBuilder resultado = new StringBuilder();
+      int[] falhas = new int[1];
+      dlg.iniciar(5, "A começar...");
+      StatusListener progresso = dlg.estado(5);
+      new Thread(() -> {
+         ProgressListener faturas = this.comPassos(this.painelFaturacao.criarListener("Faturas"), "Faturas", progresso, resultado, falhas, moeda);
+         ProgressListener notas = this.comPassos(this.painelFaturacao.criarListener("Notas de crédito"), "Notas de crédito", progresso, resultado, falhas, moeda);
+         this.painelFaturacao.iniciarAtualizacaoAoVivo();
+         try {
+            MonthlyInvoiceRun.run(cfg, ano, mes, faturas, notas);
+            HistoricoRun.registar(cfg, this.usuarioAtual.username, "GERAR_FATURACAO_MENSAL",
+               "Faturação de " + mes + "/" + ano + " executada (" + p.clientesAFaturar + " cliente(s), " + p.notasCreditoAEmitir + " nota(s) de crédito previstas). " + resultado);
+            dlg.concluir(5, falhas[0] > 0 ? DialogoPassosFaturacao.Estado.AVISO : DialogoPassosFaturacao.Estado.OK, resultado.toString().trim());
+            dlg.terminar(falhas[0] > 0
+               ? "Faturação terminada com " + falhas[0] + " erro(s). Veja as faturas com erro no ecrã Faturação (duplo-clique mostra o motivo)."
+               : "Faturação terminada sem erros.");
+         } catch (Exception e) {
+            dlg.concluir(5, DialogoPassosFaturacao.Estado.ERRO, Erros.descrever(e));
+            dlg.terminar("A faturação parou a meio: " + Erros.descrever(e) + "\n\nAs faturas já emitidas ficam; volte a gerar para continuar (as feitas são ignoradas).");
+         } finally {
+            this.painelFaturacao.pararAtualizacaoAoVivo();
+            SwingUtilities.invokeLater(() -> this.painelFaturacao.recarregarMantendoEstado());
             this.carregarResumo();
+            reativar.run();
          }
-      );
+      }, "painel-worker").start();
    }
 
-   private boolean mostrarResumoFaturacao(int var1, int var2, FaturacaoPreviewService.Preview var3) {
+   /** Passa o progresso para o painel e para a janela de passos. */
+   private ProgressListener comPassos(ProgressListener base, String fase, StatusListener passo, StringBuilder resultado, int[] falhas, NumberFormat moeda) {
+      return new ProgressListener() {
+         @Override
+         public void aoIniciar(int total) {
+            base.aoIniciar(total);
+            passo.aoAtualizarEstado(fase + ": 0 / " + total + "...", 0, Math.max(total, 1));
+         }
+
+         @Override
+         public void aoProgredir(int feitos, int total) {
+            base.aoProgredir(feitos, total);
+            passo.aoAtualizarEstado(fase + ": " + feitos + " / " + total + "...", feitos, Math.max(total, 1));
+         }
+
+         @Override
+         public void aoItemFalhar(String cliente, String erro) {
+            base.aoItemFalhar(cliente, erro);
+         }
+
+         @Override
+         public void aoConcluir(int ok, int ignorados, int falhados, BigDecimal valor) {
+            base.aoConcluir(ok, ignorados, falhados, valor);
+            synchronized (resultado) {
+               falhas[0] += falhados;
+               resultado.append(fase).append(": ").append(ok).append(" emitida(s)")
+                  .append(valor != null && valor.signum() != 0 ? " (" + moeda.format(valor) + ")" : "")
+                  .append(", ").append(ignorados).append(" já feita(s), ").append(falhados).append(" com erro.\n");
+            }
+         }
+      };
+   }
+
+   private String textoResumoFaturacao(int var1, int var2, FaturacaoPreviewService.Preview var3) {
       NumberFormat var4 = NumberFormat.getCurrencyInstance(new Locale("pt", "PT"));
       StringBuilder var5 = new StringBuilder();
       var5.append("Resumo da faturação de ").append(var2).append("/").append(var1).append(":\n\n");
@@ -556,9 +619,8 @@ public class PainelApp extends JFrame implements Tema.TemaOuvinte {
          var5.append("\nNão há nada por faturar/emitir este mês com os dados atuais.\n");
       }
 
-      var5.append("\nDeseja continuar com a faturação mensal de ").append(var2).append("/").append(var1).append("?");
-      int var6 = JOptionPane.showConfirmDialog(this, var5.toString(), "Confirmar faturação mensal", 0, 3);
-      return var6 == 0;
+      var5.append("\nContinuar com a faturação de ").append(var2).append("/").append(var1).append("?");
+      return var5.toString();
    }
 
    private JPanel montarAbaListaClientes() {

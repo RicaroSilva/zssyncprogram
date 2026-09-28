@@ -198,9 +198,16 @@ details .corpo{padding:0 16px 14px 40px}
   <h3>Gerar a faturação do mês</h3>
   <ol class="passos">
     <li><div>Escolha o mês e clique em <span class="botao ouro">Gerar faturas em falta</span>.</div></li>
-    <li><div>Se houver clientes que ainda não existem no ZSGO, o painel pergunta se os quer criar primeiro. Escolha <b>Sincronizar agora</b>: sem isso, as faturas desses clientes falham.</div></li>
-    <li><div>Aparece um resumo: quantas faturas vão ser criadas, o valor estimado, quantas já estavam feitas e quantas notas de crédito vão ser emitidas. Confirme.</div></li>
-    <li><div>Acompanhe o progresso no topo. A lista vai-se atualizando sozinha enquanto as faturas são criadas.</div></li>
+    <li><div>Abre a janela <b>Gerar faturação</b>, que mostra cada passo com o resultado:
+      <ol>
+        <li><b>Pré-análise do mês</b>: quantos clientes e notas de crédito vão ser processados.</li>
+        <li><b>Criar clientes em falta</b>: os clientes que ainda não existem no ZSGO são criados sozinhos.</li>
+        <li><b>Verificar alterações</b>: compara os dados do Cyclos (nome, NIF, morada, região…) com os do ZSGO.</li>
+        <li><b>Atualizar clientes</b>: os que mudaram são atualizados no ZSGO, para as faturas saírem com os dados certos.</li>
+        <li><b>Resumo e confirmação</b>: quantas faturas vão ser criadas, o valor estimado e as notas de crédito. Clique em <b>Emitir faturas</b> (ou <b>Cancelar</b>).</li>
+        <li><b>Emitir faturas e notas de crédito</b>: o progresso aparece na janela e a lista vai-se atualizando.</li>
+      </ol>
+      Verde = correu bem; laranja = correu com avisos (por exemplo, um cliente que não foi possível atualizar); vermelho = falhou e a faturação não foi emitida.</div></li>
   </ol>
   <p>Pode clicar em <b>Gerar faturas em falta</b> as vezes que quiser: as faturas que já foram criadas são ignoradas e só se tentam as que faltam ou falharam. Nunca cria a mesma fatura duas vezes.</p>
 

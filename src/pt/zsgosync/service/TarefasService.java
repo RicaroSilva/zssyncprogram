@@ -148,6 +148,15 @@ public class TarefasService {
                int[] s = ClientListingRun.sincronizarEspecificos(cfg, p.idsSemZsgoCode, estado);
                clientes = s[0] + " cliente(s) criado(s) antes de faturar (" + s[1] + " com erro). ";
             }
+            try {
+               List<ClientVerifyService.ClienteDesatualizado> mudaram = ClientListingRun.verificar(cfg, estado);
+               if (!mudaram.isEmpty()) {
+                  int[] r = ClientListingRun.aplicarAtualizacoes(cfg, mudaram, estado);
+                  clientes += r[0] + " cliente(s) atualizado(s) antes de faturar (" + r[1] + " com erro). ";
+               }
+            } catch (Exception e) {
+               clientes += "Não foi possível verificar alterações dos clientes: " + Erros.descrever(e) + ". ";
+            }
             Contador f = new Contador(estado, "Faturas");
             Contador n = new Contador(estado, "Notas de crédito");
             MonthlyInvoiceRun.run(cfg, mes.getYear(), mes.getMonthValue(), f, n);
