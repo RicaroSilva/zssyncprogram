@@ -24,27 +24,8 @@ public class CyclosInvoiceClient {
    }
 
    public void notificarFatura(String var1, String var2) throws IOException, InterruptedException {
-      this.notificarFatura(var1, var2, 0, 0, null, null);
-   }
-
-   /**
-    * Envia a fatura ao Cyclos. Além do PDF e do utilizador, vai o mês/ano, o id
-    * da fatura no ZSGO e, numa refaturação, "substitui_zsgo_id" = id da fatura
-    * anulada que o script do Cyclos deve trocar por esta.
-    */
-   public void notificarFatura(String var1, String var2, int ano, int mes, String zsgoId, String substituiZsgoId) throws IOException, InterruptedException {
       String var3 = var2.replace("\\", "\\\\").replace("\"", "\\\"");
-      StringBuilder extra = new StringBuilder();
-      if (ano > 0) {
-         extra.append(",\"ano\":").append(ano).append(",\"mes\":").append(mes);
-      }
-      if (zsgoId != null) {
-         extra.append(",\"zsgo_id\":\"").append(zsgoId.replace("\"", "")).append("\"");
-      }
-      if (substituiZsgoId != null) {
-         extra.append(",\"substitui_zsgo_id\":\"").append(substituiZsgoId.replace("\"", "")).append("\"");
-      }
-      String var4 = "{\"url_pdf\":\"" + var3 + "\",\"userid\":" + Long.parseLong(var1) + extra + "}";
+      String var4 = "{\"url_pdf\":\"" + var3 + "\",\"userid\":" + Long.parseLong(var1) + "}";
       HttpRequest var5 = HttpRequest.newBuilder()
          .uri(URI.create(this.url))
          .timeout(Duration.ofSeconds(20L))

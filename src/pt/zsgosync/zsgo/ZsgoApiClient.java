@@ -215,33 +215,6 @@ public class ZsgoApiClient {
       return this.sendComRetry429(var1, true);
    }
 
-   /**
-    * Anula uma fatura no ZSGO (POST /sales/{id}/annul). Se o ZSGO disser que
-    * já estava anulada, conta como sucesso.
-    */
-   public void annulSale(String id, String motivo) throws ZsgoApiException {
-      String m = motivo.length() > 50 ? motivo.substring(0, 50) : motivo;
-      HttpRequest pedido = HttpRequest.newBuilder()
-         .uri(URI.create(this.baseUrl + "/sales/" + id + "/annul"))
-         .timeout(Duration.ofSeconds(60L))
-         .header("Authorization", "Bearer " + this.token)
-         .header("Content-Type", "application/json")
-         .header("Accept", "application/json")
-         .POST(BodyPublishers.ofString("{\"reason\":" + jsonString(m) + "}"))
-         .build();
-      HttpResponse<String> r = this.sendComRetry429(pedido, false);
-      int codigo = r.statusCode();
-      if (codigo == 200 || codigo == 201 || codigo == 204) {
-         return;
-      }
-      String msg = unescapeJson(firstMatch(MESSAGE_PATTERN, r.body()));
-      String texto = msg != null ? msg : r.body();
-      if (codigo == 422 && texto != null && texto.toLowerCase().matches(".*(already|j[aá]).*(annul|anulad|cancel).*")) {
-         return;
-      }
-      throw new ZsgoApiException("POST /sales/" + id + "/annul devolveu " + codigo + ": " + texto, codigo);
-   }
-
    /** Pedido GET em bruto (para o diagnóstico): devolve "HTTP nnn" + o corpo da resposta. */
    public String getBruto(String caminho) {
       try {
