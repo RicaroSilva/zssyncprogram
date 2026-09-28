@@ -31,6 +31,8 @@ public class ZsgoDocumento {
    /** Referência externa (document.reference) que o programa põe em cada fatura. */
    public String referencia;
    public String clienteCodigo;
+   /** Notas do documento (o programa escreve "Comissões referentes ao mês de …"). */
+   public String notas;
 
    public static class Linha {
       public String id;
@@ -113,6 +115,10 @@ public class ZsgoDocumento {
       d.estado = texto(doc, "status", "state");
       d.data = texto(doc, "date", "document_date", "issued_at", "created_at");
       d.pdfUrl = texto(m, "pdf_url", "pdf");
+      d.notas = texto(doc, "notes", "observations", "remarks");
+      if (d.notas == null && doc != m) {
+         d.notas = texto(m, "notes", "observations");
+      }
       d.referencia = texto(doc, "reference", "external_reference", "your_reference");
       if (d.referencia == null && doc != m) {
          d.referencia = texto(m, "reference", "external_reference");

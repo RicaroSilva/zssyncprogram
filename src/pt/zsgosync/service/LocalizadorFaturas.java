@@ -104,6 +104,10 @@ public class LocalizadorFaturas {
 
       // A fatura do mês M só pode ter sido emitida depois do fim de M.
       LocalDate desde = LocalDate.of(ano, mes, 1).plusMonths(1L).minusDays(1L);
+      // As faturas do programa dizem nas notas a que mês se referem: as de
+      // outro mês ficam de fora (um cliente pode pagar sempre o mesmo valor).
+      String mesEsperado = ("mês de " + java.time.Month.of(mes).getDisplayName(java.time.format.TextStyle.FULL, new java.util.Locale("pt", "PT")) + " de " + ano)
+         .toLowerCase(java.util.Locale.ROOT);
       boolean camposLegiveis = this.todos.isEmpty();
       List<ZsgoDocumento> doCliente = new ArrayList<>();
       List<ZsgoDocumento> mesmoValor = new ArrayList<>();
@@ -116,6 +120,10 @@ public class LocalizadorFaturas {
          }
          LocalDate data = data(d.data);
          if (data != null && data.isBefore(desde)) {
+            continue;
+         }
+         String notas = d.notas == null ? "" : d.notas.toLowerCase(java.util.Locale.ROOT);
+         if (notas.contains("referentes ao mês de") && !notas.contains(mesEsperado)) {
             continue;
          }
          doCliente.add(d);
@@ -188,7 +196,10 @@ public class LocalizadorFaturas {
          if (b.length() > 0) {
             b.append(", ");
          }
-         b.append(d.numero != null ? d.numero : d.id);
+         b.append(d.numero != null ? d.numero : "id " + d.id);
+         if (d.data != null) {
+            b.append(" de ").append(d.data.length() >= 10 ? d.data.substring(0, 10) : d.data);
+         }
       }
       return b.toString();
    }
