@@ -42,6 +42,14 @@ normais). Ver README.md para a estrutura.
   de que não existe (nenhuma fatura do cliente depois do fim do mês);
   qualquer dúvida → fica para confirmar no painel (associar o nº ou recriar).
 
+## Formato real do ZSGO (GET /sales, confirmado 28/09/2026)
+
+`data[]` com: `id` (uuid), `status` ("paid", …) e `customer{id,code,name,tax_id}`
+no topo; `document{type, series ("API-FR"), number (int), issue_date,
+reference, notes, tax_region}`; `items[]{tax{rate}, totals{total}}`;
+`totals{net,tax,total}`; `pdf_url` vem null na lista. `meta.page_count`.
+O `search` NÃO procura pelo número — para encontrar por nº percorre-se a lista.
+
 ## Por fazer / pedidos em espera
 
 ### Faturação ocasional (ainda por especificar pelo utilizador)

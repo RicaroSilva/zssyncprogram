@@ -18,6 +18,9 @@ import pt.zsgosync.util.Json;
 public class ZsgoDocumento {
    public String id;
    public String numero;
+   /** Só o número sequencial (document.number, ex.: 11385). */
+   public String numeroSimples;
+   public String serie;
    public String tipo;
    public String estado;
    public String data;
@@ -110,11 +113,23 @@ public class ZsgoDocumento {
       Map<String, Object> totais = m.get("totals") instanceof Map ? (Map<String, Object>) m.get("totals") : m;
 
       d.id = texto(m, "id");
-      // O ZSGO devolve o número completo em "label" (ex.: "FR A/1001"); "number" é só o 1001.
-      d.numero = texto(doc, "label", "full_number", "document_number", "number", "name");
+      // Formato real do ZSGO (GET /sales): status e customer no topo; tipo,
+      // série, número, data (issue_date), notas e referência em "document".
       d.tipo = texto(doc, "type", "document_type");
-      d.estado = texto(doc, "status", "state");
-      d.data = texto(doc, "date", "document_date", "issued_at", "created_at");
+      d.serie = texto(doc, "series", "serie");
+      d.numeroSimples = texto(doc, "number", "document_number");
+      d.numero = texto(doc, "label", "full_number");
+      if (d.numero == null && d.numeroSimples != null) {
+         d.numero = (d.tipo != null ? d.tipo + " " : "") + (d.serie != null ? d.serie + "/" : "") + d.numeroSimples;
+      }
+      d.estado = texto(m, "status", "state");
+      if (d.estado == null && doc != m) {
+         d.estado = texto(doc, "status", "state");
+      }
+      d.data = texto(doc, "issue_date", "date", "document_date", "issued_at");
+      if (d.data == null) {
+         d.data = texto(m, "issue_date", "date", "created_at");
+      }
       d.pdfUrl = texto(m, "pdf_url", "pdf");
       d.notas = texto(doc, "notes", "observations", "remarks");
       if (d.notas == null && doc != m) {
@@ -130,7 +145,7 @@ public class ZsgoDocumento {
       d.liquido = numero(totais, "net_total", "total_net", "subtotal", "total_without_tax", "net", "total_liquid");
       d.iva = numero(totais, "tax_total", "total_tax", "vat_total", "total_vat", "tax", "taxes", "vat");
       Object anulado = primeiro(doc, "annulled", "is_annulled", "canceled", "cancelled");
-      d.anulado = Boolean.TRUE.equals(anulado) || (d.estado != null && d.estado.toLowerCase().matches(".*(anul|annul|cancel).*"))
+      d.anulado = Boolean.TRUE.equals(anulado) || (d.estado != null && d.estado.toLowerCase().matches(".*(anul|annul|cancel|void).*"))
          || (d.estado != null && CODIGOS_ANULADO.contains(d.estado.trim()))
          || temMarcaDeAnulacao(doc) || (doc != m && temMarcaDeAnulacao(m));
 
@@ -144,8 +159,9 @@ public class ZsgoDocumento {
                l.produto = texto(it, "product_reference", "reference", "product");
                l.quantidade = numero(it, "quantity", "qty");
                l.precoUnitario = numero(it, "unit_price_net", "unit_price", "price");
-               l.taxaIva = numero(it, "tax_rate", "vat_rate", "tax");
-               l.total = numero(it, "total", "gross_total", "total_with_tax", "line_total", "amount");
+               l.taxaIva = it.get("tax") instanceof Map ? numero((Map<String, Object>) it.get("tax"), "rate") : numero(it, "tax_rate", "vat_rate", "tax");
+               l.total = it.get("totals") instanceof Map ? numero((Map<String, Object>) it.get("totals"), "total")
+                  : numero(it, "total", "gross_total", "total_with_tax", "line_total", "amount");
                l.notas = texto(it, "notes", "description");
                d.linhas.add(l);
             }

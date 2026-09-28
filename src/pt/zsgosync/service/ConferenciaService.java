@@ -141,7 +141,28 @@ public class ConferenciaService {
             soNumero.add(d);
          }
       }
-      return soNumero.size() == 1 ? zsgo.getSale(soNumero.get(0).id) : null;
+      if (soNumero.size() == 1) {
+         return zsgo.getSale(soNumero.get(0).id);
+      }
+      // A pesquisa do ZSGO não procura pelo número: percorre a lista toda.
+      List<ZsgoDocumento> naLista = new LocalizadorFaturas(zsgo).porNumero(t);
+      if (naLista.size() == 1) {
+         ZsgoDocumento d = naLista.get(0);
+         try {
+            ZsgoDocumento completo = zsgo.getSale(d.id);
+            return completo.id != null ? completo : d;
+         } catch (Exception e) {
+            return d;
+         }
+      }
+      if (naLista.size() > 1) {
+         StringBuilder b = new StringBuilder();
+         for (ZsgoDocumento d : naLista) {
+            b.append(b.length() > 0 ? ", " : "").append(d.numero);
+         }
+         throw new IllegalStateException("Há " + naLista.size() + " documentos com o número " + t + " (" + b + "). Escreva o número completo, com o tipo e a série.");
+      }
+      return null;
    }
 
    /** A fatura existe no ZSGO: associa-a (a próxima faturação só envia o PDF ao Cyclos). */

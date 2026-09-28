@@ -146,6 +146,24 @@ public class LocalizadorFaturas {
       return new Resultado(Tipo.NAO_EXISTE, null, "não há nenhuma fatura deste cliente no ZSGO depois de " + desde);
    }
 
+   /** Documentos cujo número é o indicado ("11385", "FR API-FR/11385", …). */
+   public synchronized List<ZsgoDocumento> porNumero(String texto) throws Exception {
+      this.carregar();
+      if (this.falhaLeitura != null) {
+         throw new Exception("não foi possível ler a lista do ZSGO: " + this.falhaLeitura);
+      }
+      String t = texto.trim();
+      List<ZsgoDocumento> r = new ArrayList<>();
+      for (ZsgoDocumento d : this.todos) {
+         boolean igual = t.equals(d.id) || t.equalsIgnoreCase(d.numero) || t.equals(d.numeroSimples)
+            || (d.numeroSimples != null && (t.endsWith("/" + d.numeroSimples) || t.endsWith(" " + d.numeroSimples)) && (d.tipo == null || t.toUpperCase().startsWith(d.tipo.toUpperCase())));
+         if (igual) {
+            r.add(d);
+         }
+      }
+      return r;
+   }
+
    private void carregar() {
       if (this.todos != null || this.falhaLeitura != null) {
          return;
