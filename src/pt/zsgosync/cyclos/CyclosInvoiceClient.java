@@ -24,7 +24,7 @@ public class CyclosInvoiceClient {
    }
 
    public void notificarFatura(String var1, String var2) throws IOException, InterruptedException {
-      this.notificarFatura(var1, var2, 0, 0, null, null);
+      this.notificarFatura(var1, var2, 0, 0, null, null, null);
    }
 
    /**
@@ -32,7 +32,8 @@ public class CyclosInvoiceClient {
     * da fatura no ZSGO e, numa refaturação, "substitui_zsgo_id" = id da fatura
     * anulada que o script do Cyclos deve trocar por esta.
     */
-   public void notificarFatura(String var1, String var2, int ano, int mes, String zsgoId, String substituiZsgoId) throws IOException, InterruptedException {
+   public void notificarFatura(String var1, String var2, int ano, int mes, String zsgoId, String substituiZsgoId, String numero)
+      throws IOException, InterruptedException {
       String var3 = var2.replace("\\", "\\\\").replace("\"", "\\\"");
       StringBuilder extra = new StringBuilder();
       if (ano > 0) {
@@ -40,6 +41,9 @@ public class CyclosInvoiceClient {
       }
       if (zsgoId != null) {
          extra.append(",\"zsgo_id\":\"").append(zsgoId.replace("\"", "")).append("\"");
+      }
+      if (numero != null) {
+         extra.append(",\"numero\":\"").append(numero.replace("\\", "").replace("\"", "")).append("\"");
       }
       if (substituiZsgoId != null) {
          extra.append(",\"substitui_zsgo_id\":\"").append(substituiZsgoId.replace("\"", "")).append("\"");

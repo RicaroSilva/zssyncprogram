@@ -48,8 +48,10 @@ normais). Ver README.md para a estrutura.
 billing.query dá agora (`RefaturacaoService`); as escolhidas são anuladas no
 ZSGO (`POST /sales/{id}/annul`), a linha volta a PENDENTE com
 `substitui_sale_id` = id anulado e o histórico em `zsgo_anuladas`. Ao enviar a
-nova ao Cyclos vão também `ano`, `mes`, `zsgo_id` e `substitui_zsgo_id` —
-o script do Cyclos (/web/run/invoice) troca a fatura antiga pela nova.
+nova ao Cyclos vão também `ano`, `mes`, `zsgo_id`, `numero` (ex.: "FR API-FR/11385",
+texto do link) e `substitui_zsgo_id` —
+o script do Cyclos (/web/run/invoice, versão em `docs/cyclos_invoice_script.groovy`,
+campo novo `UR_Invoices_F_ZsgoId`) troca a fatura antiga pela nova.
 
 ## Formato real do ZSGO (GET /sales, confirmado 28/09/2026)
 

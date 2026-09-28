@@ -36,7 +36,7 @@ public class InvoiceSyncDao {
    }
 
    public InvoiceSyncDao.Estado getEstado(Connection var1, String var2, String var3, int var4, int var5) throws SQLException {
-      String var6 = "SELECT status, zsgo_sale_id, pdf_url, tentativas, zsgo_incerto, substitui_sale_id FROM zsgo_invoice_sync WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?";
+      String var6 = "SELECT status, zsgo_sale_id, pdf_url, tentativas, zsgo_incerto, substitui_sale_id, zsgo_numero FROM zsgo_invoice_sync WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?";
 
       InvoiceSyncDao.Estado var10;
       try (PreparedStatement var7 = var1.prepareStatement(var6)) {
@@ -57,6 +57,7 @@ public class InvoiceSyncDao {
             var15.tentativas = var8.getInt("tentativas");
             var15.incerto = var8.getBoolean("zsgo_incerto");
             var15.substituiSaleId = var8.getString("substitui_sale_id");
+            var15.zsgoNumero = var8.getString("zsgo_numero");
             var10 = var15;
          }
       }
@@ -268,6 +269,18 @@ public class InvoiceSyncDao {
       }
    }
 
+   /** Guarda o nome do documento no ZSGO (ex.: "FR API-FR/11385"). */
+   public void guardarNumero(Connection c, String cliente, String origem, int ano, int mes, String numero) throws SQLException {
+      try (PreparedStatement ps = c.prepareStatement("UPDATE zsgo_invoice_sync SET zsgo_numero = ? WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?")) {
+         ps.setString(1, numero);
+         ps.setLong(2, paraLong(cliente));
+         ps.setLong(3, paraLong(origem));
+         ps.setInt(4, ano);
+         ps.setInt(5, mes);
+         ps.executeUpdate();
+      }
+   }
+
    /** O Cyclos já recebeu a fatura nova (e trocou a antiga). */
    public void limparSubstituicao(Connection c, String cliente, String origem, int ano, int mes) throws SQLException {
       try (PreparedStatement ps = c.prepareStatement("UPDATE zsgo_invoice_sync SET substitui_sale_id = NULL WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?")) {
@@ -362,6 +375,7 @@ public class InvoiceSyncDao {
       public int tentativas;
       public boolean incerto;
       public String substituiSaleId;
+      public String zsgoNumero;
    }
 
    public static class FaturaDetalhe {
