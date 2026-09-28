@@ -271,12 +271,15 @@ public class MonthlyInvoiceService {
             etapa = "Cyclos: enviar PDF";
             notaErro = " (A fatura já existe no ZSGO, id=" + var67 + " — na próxima execução só se repete o envio ao Cyclos.)";
             long var68 = System.nanoTime();
-            this.cyclosClient.notificarFatura(var1, var29);
+            this.cyclosClient.notificarFatura(var1, var29, var4, var5, var67, var32 != null ? var32.substituiSaleId : null);
             var21 = (System.nanoTime() - var68) / 1000000L;
             var10.addAndGet(var21);
             etapa = "BD: marcar como sincronizada";
             long var66 = System.nanoTime();
             this.invoiceDao.marcarSincronizado(var64, var1, var2, var4, var5);
+            if (var32 != null && var32.substituiSaleId != null) {
+               this.invoiceDao.limparSubstituicao(var64, var1, var2, var4, var5);
+            }
             var11.addAndGet(var23 += (System.nanoTime() - var66) / 1000000L);
             var6.incrementAndGet();
             return;

@@ -241,6 +241,15 @@ details .corpo{padding:0 16px 14px 40px}
   <h3>Exportar</h3>
   <p>O botão <span class="botao">Exportar ▾</span> grava em ficheiro CSV (abre no Excel) as <b>faturas do mês</b>, as <b>linhas por rubrica</b> ou as <b>notas de crédito</b>. A exportação das faturas respeita o filtro escolhido.</p>
 
+  <h3>Refaturar (corrigir faturas já emitidas)</h3>
+  <p>Se uma fatura já emitida ficou mal, por exemplo porque uma rubrica tinha o nome errado no mapeamento e as transações dela ficaram de fora, corrija primeiro a causa e depois use <span class="botao">Refaturar…</span>:</p>
+  <ol class="passos">
+    <li><div>Escolha o mês e clique em <b>Refaturar…</b>. O programa compara cada fatura emitida com o que a faturação daria agora e lista as que têm valor diferente, com as rubricas em falta.</div></li>
+    <li><div>Marque as que quer refazer e clique em <b>Anular e refaturar selecionadas</b>. Cada uma é <b>anulada no ZSGO</b> (isto não se desfaz) e fica por faturar.</div></li>
+    <li><div>Clique em <b>Gerar faturas em falta</b>. É criada a fatura nova e, ao enviá-la ao Cyclos, o programa indica qual era a anulada, para o Cyclos a trocar pela nova.</div></li>
+  </ol>
+  <p>Para refazer uma fatura só, pode também abrir o detalhe (duplo-clique) e clicar em <span class="botao">Anular e refaturar</span>.</p>
+
   <h3>Notas de crédito</h3>
   <p>O separador <b>Notas de crédito</b> mostra os estornos do mês, com o ID do chargeback, o ID da transação original, o valor e o estado.</p>
 </section>

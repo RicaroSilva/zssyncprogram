@@ -51,6 +51,20 @@ public class InvoiceLineDetailDao {
       }
    }
 
+   /** Apaga o detalhe de rubricas de uma fatura (antes de a refazer). */
+   public void apagarLinhas(Connection c, String cliente, String origem, int ano, int mes) throws SQLException {
+      String sql = "DELETE FROM zsgo_invoice_line_detail WHERE cliente_id = ? AND ano = ? AND mes = ? AND (origem_id = ? OR (origem_id IS NULL AND ? = cliente_id))";
+      try (PreparedStatement ps = c.prepareStatement(sql)) {
+         long o = paraLong(origem);
+         ps.setLong(1, paraLong(cliente));
+         ps.setInt(2, ano);
+         ps.setInt(3, mes);
+         ps.setLong(4, o);
+         ps.setLong(5, o);
+         ps.executeUpdate();
+      }
+   }
+
    public List<InvoiceLineDetailDao.LinhaDetalhe> obterPorMes(Connection var1, int var2, int var3) throws SQLException {
       ArrayList var4 = new ArrayList();
       String var5 = "SELECT d.cliente_id, d.rubrica, d.product_reference, d.nr_transacoes, d.valor, d.descricao,\n       s.zsgo_dados->'data'->'identity'->>'name' AS nome,\n       s.zsgo_dados->'data'->'identity'->>'tax_id' AS nif,\n       s.zsgo_dados->'data'->'billing'->>'exemption_code' AS exemption_code\nFROM zsgo_invoice_line_detail d\nLEFT JOIN zsgo_client_sync s ON s.user_id = d.cliente_id\nWHERE d.ano = ? AND d.mes = ?\nORDER BY d.cliente_id ASC, d.rubrica ASC\n";

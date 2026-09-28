@@ -61,6 +61,7 @@ import pt.zsgosync.db.InvoiceSyncDao;
 import pt.zsgosync.progress.ProgressListener;
 import pt.zsgosync.progress.StatusListener;
 import pt.zsgosync.service.ConferenciaService;
+import pt.zsgosync.service.RefaturacaoService;
 import pt.zsgosync.service.RelatorioService;
 import pt.zsgosync.util.Erros;
 import pt.zsgosync.zsgo.ZsgoDocumento;
@@ -81,6 +82,7 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
    private final JComboBox<YearMonth> comboMes = new JComboBox<>();
    private final JButton btnGerar;
    private final JButton btnConferir = new JButton("Conferir com o ZSGO");
+   private final JButton btnRefaturar = new JButton("Refaturar…");
    private final JButton btnExportar = new JButton("Exportar ▾");
    private final JLabel labelEstado;
    private final JProgressBar progresso;
@@ -172,6 +174,8 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
 
       this.btnConferir.setToolTipText("Vai buscar ao ZSGO o valor real de cada fatura deste mês e compara com o que foi enviado. Não altera nada no ZSGO.");
       this.btnConferir.addActionListener(e -> this.conferir());
+      this.btnRefaturar.setToolTipText("Faturas já emitidas cujo valor mudou (ex.: rubrica que faltava): anular no ZSGO e voltar a faturar.");
+      this.btnRefaturar.addActionListener(e -> this.abrirRefaturacao());
       JPopupMenu menuExportar = new JPopupMenu();
       JMenuItem itemFaturas = new JMenuItem("Faturas do mês (CSV)");
       itemFaturas.addActionListener(e -> this.exportarFaturas());
@@ -192,6 +196,7 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
       linhaAcoes.add(Box.createHorizontalStrut(10));
       linhaAcoes.add(this.btnGerar);
       linhaAcoes.add(this.btnConferir);
+      linhaAcoes.add(this.btnRefaturar);
       linhaAcoes.add(this.btnExportar);
 
       JPanel linhaEstado = new JPanel(new BorderLayout(12, 0));
@@ -717,6 +722,20 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
          botoes.add(btnExiste);
          botoes.add(btnRecriar);
       }
+      if ("SINCRONIZADO".equals(f.status) && f.zsgoSaleId != null) {
+         JButton btnRefazer = new JButton("Anular e refaturar");
+         btnRefazer.setToolTipText("Anula esta fatura no ZSGO e deixa-a por faturar; a próxima geração cria a nova e o Cyclos troca a antiga.");
+         btnRefazer.addActionListener(e -> {
+            RefaturacaoService.Divergencia d = new RefaturacaoService.Divergencia();
+            d.fatura = f;
+            d.valorFaturado = f.valorTotal;
+            d.valorAgora = f.valorTotal != null ? f.valorTotal : BigDecimal.ZERO;
+            if (this.executarRefaturacao(dialogo, java.util.List.of(d))) {
+               dialogo.dispose();
+            }
+         });
+         botoes.add(btnRefazer);
+      }
       botoes.add(btnLer);
       botoes.add(btnCopiar);
       botoes.add(btnFechar);
@@ -728,6 +747,147 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
       dialogo.pack();
       dialogo.setLocationRelativeTo(this);
       dialogo.setVisible(true);
+   }
+
+   // ------------------------------------------------------------ refaturação
+
+   private void abrirRefaturacao() {
+      YearMonth ym = this.getMesSelecionado();
+      JDialog dialogo = new JDialog(SwingUtilities.getWindowAncestor(this), "Refaturar — " + nomeMes(ym));
+      dialogo.setModal(true);
+      JLabel info = new JLabel("A comparar as faturas emitidas com o que a faturação daria agora...");
+      info.setFont(Tema.FONT_BASE);
+      DefaultTableModel modelo = new DefaultTableModel(new String[]{"Refazer", "Cliente", "Nome", "Nº no ZSGO", "Faturado", "Devia ser", "Diferença", "Rubricas em falta"}, 0) {
+         @Override
+         public boolean isCellEditable(int r, int c) {
+            return c == 0;
+         }
+
+         @Override
+         public Class<?> getColumnClass(int c) {
+            return c == 0 ? Boolean.class : (c >= 4 && c <= 6 ? BigDecimal.class : String.class);
+         }
+      };
+      JTable tabela = new JTable(modelo);
+      tabela.setRowHeight(24);
+      RendererValor rv = new RendererValor(false);
+      for (int c = 4; c <= 5; c++) {
+         tabela.getColumnModel().getColumn(c).setCellRenderer(rv);
+      }
+      tabela.getColumnModel().getColumn(6).setCellRenderer(new RendererValor(true));
+      int[] larg = {60, 70, 220, 130, 90, 90, 90, 260};
+      for (int i = 0; i < larg.length; i++) {
+         tabela.getColumnModel().getColumn(i).setPreferredWidth(larg[i]);
+      }
+      List<RefaturacaoService.Divergencia> lista = new ArrayList<>();
+      JTextField motivo = new JTextField("Refaturação: rubrica em falta", 28);
+      JButton todas = new JButton("Selecionar todas");
+      todas.addActionListener(e -> {
+         for (int r = 0; r < modelo.getRowCount(); r++) {
+            modelo.setValueAt(Boolean.TRUE, r, 0);
+         }
+      });
+      JButton refazer = new JButton("Anular e refaturar selecionadas");
+      refazer.setEnabled(false);
+      refazer.addActionListener(e -> {
+         List<RefaturacaoService.Divergencia> escolhidas = new ArrayList<>();
+         for (int r = 0; r < modelo.getRowCount(); r++) {
+            if (Boolean.TRUE.equals(modelo.getValueAt(r, 0))) {
+               escolhidas.add(lista.get(r));
+            }
+         }
+         if (escolhidas.isEmpty()) {
+            JOptionPane.showMessageDialog(dialogo, "Marque as faturas a refazer (coluna \"Refazer\").", "Refaturar", JOptionPane.INFORMATION_MESSAGE);
+            return;
+         }
+         this.motivoRefaturacao = motivo.getText().trim().isEmpty() ? "Refaturação" : motivo.getText().trim();
+         if (this.executarRefaturacao(dialogo, escolhidas)) {
+            dialogo.dispose();
+         }
+      });
+      JButton fechar = new JButton("Fechar");
+      fechar.addActionListener(e -> dialogo.dispose());
+      JPanel baixo = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+      baixo.add(new JLabel("Motivo da anulação:"));
+      baixo.add(motivo);
+      baixo.add(todas);
+      baixo.add(refazer);
+      baixo.add(fechar);
+      JPanel conteudo = new JPanel(new BorderLayout(0, 8));
+      conteudo.setBorder(new EmptyBorder(12, 12, 12, 12));
+      conteudo.add(info, BorderLayout.NORTH);
+      JScrollPane sp = new JScrollPane(tabela);
+      sp.setPreferredSize(new Dimension(1040, 420));
+      conteudo.add(sp, BorderLayout.CENTER);
+      conteudo.add(baixo, BorderLayout.SOUTH);
+      dialogo.setContentPane(conteudo);
+      dialogo.pack();
+      dialogo.setLocationRelativeTo(this);
+
+      new Thread(() -> {
+         try {
+            List<RefaturacaoService.Divergencia> r = RefaturacaoService.procurar(this.config.get(), ym.getYear(), ym.getMonthValue());
+            SwingUtilities.invokeLater(() -> {
+               lista.addAll(r);
+               for (RefaturacaoService.Divergencia d : r) {
+                  InvoiceSyncDao.FaturaDetalhe f = d.fatura;
+                  modelo.addRow(new Object[]{Boolean.FALSE, f.clienteId + (f.isRedirecionada() ? " (via " + f.origemId + ")" : ""), f.nome != null ? f.nome : "—",
+                     f.zsgoNumero != null ? f.zsgoNumero : f.zsgoSaleId, d.valorFaturado, d.valorAgora, d.diferenca(),
+                     d.rubricasEmFalta.isEmpty() ? "(mesmas rubricas, valor diferente)" : String.join(", ", d.rubricasEmFalta)});
+               }
+               info.setText(r.isEmpty()
+                  ? "Todas as faturas emitidas em " + nomeMes(ym) + " batem certo com o que a faturação daria agora. Não há nada a refazer."
+                  : "<html>" + r.size() + " fatura(s) de " + nomeMes(ym) + " com valor diferente do que a faturação daria agora. Marque as que quer refazer: "
+                     + "cada uma é <b>anulada no ZSGO</b> e fica por faturar; depois clique em <b>Gerar faturas em falta</b>. "
+                     + "Ao enviar a nova ao Cyclos vai o id da anulada, para o Cyclos a trocar.</html>");
+               refazer.setEnabled(!r.isEmpty());
+            });
+         } catch (Exception ex) {
+            SwingUtilities.invokeLater(() -> info.setText("Não foi possível comparar: " + Erros.descrever(ex)));
+         }
+      }, "procurar-refaturacao").start();
+      dialogo.setVisible(true);
+   }
+
+   private String motivoRefaturacao = "Refaturação";
+
+   /** Pede confirmação e anula/prepara cada fatura. Devolve true se correu. */
+   private boolean executarRefaturacao(java.awt.Component pai, List<RefaturacaoService.Divergencia> escolhidas) {
+      String msg = "Vai ANULAR no ZSGO " + escolhidas.size() + " fatura(s) de " + nomeMes(this.getMesSelecionado()) + ".\n"
+         + "Isto não se desfaz. Depois terá de clicar em \"Gerar faturas em falta\" para criar as novas.\n\nMotivo: " + this.motivoRefaturacao
+         + "\n\nContinuar?";
+      if (JOptionPane.showConfirmDialog(pai, msg, "Anular e refaturar", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE) != JOptionPane.YES_OPTION) {
+         return false;
+      }
+      YearMonth ym = this.getMesSelecionado();
+      String motivo = this.motivoRefaturacao;
+      this.btnRefaturar.setEnabled(false);
+      this.btnGerar.setEnabled(false);
+      new Thread(() -> {
+         int ok = 0;
+         StringBuilder erros = new StringBuilder();
+         int i = 0;
+         for (RefaturacaoService.Divergencia d : escolhidas) {
+            int n = ++i;
+            SwingUtilities.invokeLater(() -> this.mostrarEstado("A anular no ZSGO para refaturar... " + n + " / " + escolhidas.size(), n, escolhidas.size()));
+            try {
+               RefaturacaoService.refaturar(this.config.get(), d.fatura, ym.getYear(), ym.getMonthValue(), motivo, "painel");
+               ok++;
+            } catch (Exception ex) {
+               erros.append("\n• Cliente ").append(d.fatura.clienteId).append(": ").append(Erros.descrever(ex));
+            }
+         }
+         int feitas = ok;
+         SwingUtilities.invokeLater(() -> {
+            this.btnRefaturar.setEnabled(true);
+            this.btnGerar.setEnabled(true);
+            this.recarregar(feitas + " fatura(s) anulada(s) e por faturar. Clique em \"Gerar faturas em falta\" para criar as novas.");
+            JOptionPane.showMessageDialog(this, feitas + " fatura(s) anulada(s) no ZSGO e marcada(s) para refaturar."
+               + (erros.length() > 0 ? "\n\nNão foi possível anular:" + erros : "") + "\n\nAgora clique em \"Gerar faturas em falta\".", "Refaturar",
+               erros.length() > 0 ? JOptionPane.WARNING_MESSAGE : JOptionPane.INFORMATION_MESSAGE);
+         });
+      }, "refaturar").start();
+      return true;
    }
 
    private void associarExistente(JDialog dialogo, InvoiceSyncDao.FaturaDetalhe f) {
@@ -817,6 +977,9 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
       b.append(")\n");
       b.append("  Valor enviado ao ZSGO: ").append(f.valorTotal != null ? MOEDA.format(f.valorTotal) : "—").append("  (enviado como preço COM IVA incluído)\n");
       b.append("  ID do documento no ZSGO: ").append(f.zsgoSaleId != null ? f.zsgoSaleId : "— (ainda não criado)").append('\n');
+      if (f.anuladas != null && !f.anuladas.isBlank()) {
+         b.append("  Faturas anuladas para refaturar: ").append(f.anuladas).append('\n');
+      }
       if (f.ultimoErro != null && !"SINCRONIZADO".equals(f.status)) {
          b.append("\nERRO\n  ").append(f.ultimoErro).append('\n');
       }
@@ -1036,7 +1199,7 @@ public class PainelFaturacao extends JPanel implements Tema.TemaOuvinte {
       }
       this.labelEstado.setForeground(Tema.MUTED_FOREGROUND);
       this.labelDica.setForeground(Tema.MUTED_FOREGROUND);
-      for (JButton b : new JButton[]{this.btnConferir, this.btnExportar}) {
+      for (JButton b : new JButton[]{this.btnConferir, this.btnRefaturar, this.btnExportar}) {
          b.setFont(Tema.FONT_BOLD);
          b.setBackground(Tema.SURFACE_2);
          b.setForeground(Tema.FOREGROUND);

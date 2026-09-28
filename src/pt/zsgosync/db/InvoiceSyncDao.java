@@ -28,11 +28,15 @@ public class InvoiceSyncDao {
          // Pedido de criação sem resposta: a fatura pode existir no ZSGO. Enquanto
          // estiver marcada, a faturação NÃO volta a criá-la (evita duplicados).
          var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_incerto BOOLEAN NOT NULL DEFAULT FALSE");
+         // Refaturação: id da fatura anulada que o Cyclos deve trocar pela nova,
+         // e histórico das faturas anuladas desta linha.
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS substitui_sale_id VARCHAR(64)");
+         var3.execute("ALTER TABLE zsgo_invoice_sync ADD COLUMN IF NOT EXISTS zsgo_anuladas TEXT");
       }
    }
 
    public InvoiceSyncDao.Estado getEstado(Connection var1, String var2, String var3, int var4, int var5) throws SQLException {
-      String var6 = "SELECT status, zsgo_sale_id, pdf_url, tentativas, zsgo_incerto FROM zsgo_invoice_sync WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?";
+      String var6 = "SELECT status, zsgo_sale_id, pdf_url, tentativas, zsgo_incerto, substitui_sale_id FROM zsgo_invoice_sync WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?";
 
       InvoiceSyncDao.Estado var10;
       try (PreparedStatement var7 = var1.prepareStatement(var6)) {
@@ -52,6 +56,7 @@ public class InvoiceSyncDao {
             var15.pdfUrl = var8.getString("pdf_url");
             var15.tentativas = var8.getInt("tentativas");
             var15.incerto = var8.getBoolean("zsgo_incerto");
+            var15.substituiSaleId = var8.getString("substitui_sale_id");
             var10 = var15;
          }
       }
@@ -163,7 +168,7 @@ public class InvoiceSyncDao {
          SELECT f.user_id, f.origem_id, f.status, f.zsgo_sale_id, f.valor_total, f.pdf_url,
                 f.tentativas, f.ultimo_erro, f.atualizado_em,
                 f.zsgo_numero, f.zsgo_total, f.zsgo_liquido, f.zsgo_iva, f.zsgo_estado, f.zsgo_anulado,
-                f.zsgo_conferido_em, f.zsgo_erro_conferencia, f.zsgo_incerto,
+                f.zsgo_conferido_em, f.zsgo_erro_conferencia, f.zsgo_incerto, f.zsgo_anuladas,
                 s.zsgo_code,
                 s.zsgo_dados->'data'->'identity'->>'name' AS nome,
                 s.zsgo_dados->'data'->'identity'->>'tax_id' AS nif,
@@ -224,12 +229,54 @@ public class InvoiceSyncDao {
                var8.zsgoConferidoEm = var7.getTimestamp("zsgo_conferido_em");
                var8.zsgoErroConferencia = var7.getString("zsgo_erro_conferencia");
                var8.incerto = var7.getBoolean("zsgo_incerto");
+               var8.anuladas = var7.getString("zsgo_anuladas");
                var4.add(var8);
             }
          }
       }
 
       return var4;
+   }
+
+   /**
+    * A fatura foi anulada no ZSGO para ser refeita: esquece-a e deixa a
+    * linha "por faturar". Guarda o id antigo para o Cyclos a trocar pela nova.
+    */
+   public void prepararRefaturacao(Connection c, String cliente, String origem, int ano, int mes, String idAnulado, String numeroAnulado, String motivo)
+      throws SQLException {
+      String sql = """
+         UPDATE zsgo_invoice_sync SET
+             substitui_sale_id = COALESCE(substitui_sale_id, ?),
+             zsgo_anuladas = COALESCE(zsgo_anuladas || '; ', '') || ?,
+             zsgo_sale_id = NULL, pdf_url = NULL, valor_total = NULL, status = 'PENDENTE', zsgo_incerto = FALSE,
+             zsgo_numero = NULL, zsgo_total = NULL, zsgo_liquido = NULL, zsgo_iva = NULL, zsgo_estado = NULL, zsgo_anulado = NULL,
+             zsgo_conferido_em = NULL, zsgo_erro_conferencia = NULL,
+             ultimo_erro = ?, atualizado_em = now()
+         WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?
+         """;
+      try (PreparedStatement ps = c.prepareStatement(sql)) {
+         ps.setString(1, idAnulado);
+         ps.setString(2, (numeroAnulado != null ? numeroAnulado + " " : "") + "(" + idAnulado + ") anulada em "
+            + java.time.LocalDateTime.now().withSecond(0).withNano(0) + ": " + motivo);
+         ps.setString(3, "Fatura " + (numeroAnulado != null ? numeroAnulado : idAnulado) + " anulada para refaturar (" + motivo
+            + "). Clique em \"Gerar faturas em falta\" para criar a nova.");
+         ps.setLong(4, paraLong(cliente));
+         ps.setLong(5, paraLong(origem));
+         ps.setInt(6, ano);
+         ps.setInt(7, mes);
+         ps.executeUpdate();
+      }
+   }
+
+   /** O Cyclos já recebeu a fatura nova (e trocou a antiga). */
+   public void limparSubstituicao(Connection c, String cliente, String origem, int ano, int mes) throws SQLException {
+      try (PreparedStatement ps = c.prepareStatement("UPDATE zsgo_invoice_sync SET substitui_sale_id = NULL WHERE user_id = ? AND origem_id = ? AND ano = ? AND mes = ?")) {
+         ps.setLong(1, paraLong(cliente));
+         ps.setLong(2, paraLong(origem));
+         ps.setInt(3, ano);
+         ps.setInt(4, mes);
+         ps.executeUpdate();
+      }
    }
 
    public void marcarIncerto(Connection c, String cliente, String origem, int ano, int mes, boolean incerto) throws SQLException {
@@ -314,6 +361,7 @@ public class InvoiceSyncDao {
       public String pdfUrl;
       public int tentativas;
       public boolean incerto;
+      public String substituiSaleId;
    }
 
    public static class FaturaDetalhe {
@@ -344,6 +392,8 @@ public class InvoiceSyncDao {
       public java.sql.Timestamp zsgoConferidoEm;
       public String zsgoErroConferencia;
       public boolean incerto;
+      /** Faturas anuladas para refaturar esta linha ("nº (id) anulada em data: motivo; …"). */
+      public String anuladas;
 
       /** Diferença entre o que o ZSGO tem e o que o programa enviou (null se não conferida). */
       public BigDecimal diferenca() {

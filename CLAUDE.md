@@ -42,6 +42,15 @@ normais). Ver README.md para a estrutura.
   de que não existe (nenhuma fatura do cliente depois do fim do mês);
   qualquer dúvida → fica para confirmar no painel (associar o nº ou recriar).
 
+## Refaturação
+
+"Refaturar…" (Faturação) compara as faturas emitidas com o que a
+billing.query dá agora (`RefaturacaoService`); as escolhidas são anuladas no
+ZSGO (`POST /sales/{id}/annul`), a linha volta a PENDENTE com
+`substitui_sale_id` = id anulado e o histórico em `zsgo_anuladas`. Ao enviar a
+nova ao Cyclos vão também `ano`, `mes`, `zsgo_id` e `substitui_zsgo_id` —
+o script do Cyclos (/web/run/invoice) troca a fatura antiga pela nova.
+
 ## Formato real do ZSGO (GET /sales, confirmado 28/09/2026)
 
 `data[]` com: `id` (uuid), `status` ("paid", …) e `customer{id,code,name,tax_id}`
