@@ -108,6 +108,29 @@ Outras ferramentas na Faturação:
 - **Notas de crédito** e **Diagnóstico ZSGO** (resposta em bruto do ZSGO,
   para ajustar a leitura ao formato real).
 
+## Tarefas agendadas
+
+Em **Tarefas** ligam-se/desligam-se e marca-se a hora das mesmas três
+tarefas do programa em Java (a configuração é a mesma tabela,
+`zsgo_tarefas`): Sincronizar clientes novos, Atualizar dados dos clientes e
+Faturação mensal (dia do mês + hora; faz os 6 passos sem esperar pela
+confirmação e fica visível como uma execução normal). Também há
+**Executar agora**.
+
+O agendador corre **dentro da aplicação** (de 30 em 30 s), por isso deixa
+de ser preciso ter o `agendador.bat` aberto num computador. Pode ficar
+ligado ao mesmo tempo que o do Java: a reserva da tarefa é a mesma e cada
+execução agendada só corre uma vez. As horas são de Lisboa
+(`FUSO_HORARIO`); `AGENDADOR=false` desliga-o nesta aplicação.
+
+## Utilizadores e perfis
+
+Em **Utilizadores** dá-se acesso (o mesmo email da conta Keycloak) e
+escolhem-se os perfis; em **Perfis** define-se, por área, quem pode
+consultar, criar/gerar, editar e eliminar. O perfil **Super Admin** tem
+sempre acesso total; a aplicação nunca fica sem um Super Admin ativo e só
+um Super Admin pode dar ou tirar esse perfil.
+
 **Importante durante a transição:** não gerar a faturação do mesmo mês ao
 mesmo tempo no painel em Java e na página web.
 

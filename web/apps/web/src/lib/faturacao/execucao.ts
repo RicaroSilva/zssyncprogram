@@ -131,7 +131,7 @@ export async function iniciarFaturacao(ano: number, mes: number, utilizador: str
   return exec.id;
 }
 
-async function preparar(id: string, ano: number, mes: number, utilizador: string): Promise<void> {
+async function preparar(id: string, ano: number, mes: number, utilizador: string, automatico = false): Promise<void> {
   const r = new RegistoPassos(id);
   let passo = 0;
   try {
@@ -202,6 +202,13 @@ async function preparar(id: string, ano: number, mes: number, utilizador: string
       p = await calcularPreview(ano, mes);
     }
     const nada = p.clientesAFaturar === 0 && p.notasCreditoAEmitir === 0;
+    if (automatico) {
+      // Tarefa agendada: ninguém está a ver — emite logo (como o Java).
+      await r.gravar(true, { estado: "A_EMITIR", resumo: p as never });
+      await r.mudar(4, "OK", `Confirmado automaticamente (tarefa agendada): ${p.clientesAFaturar} cliente(s) a faturar (${euros(p.valorAFaturar)}), ${p.notasCreditoAEmitir} nota(s) de crédito.`);
+      await emitir(r, ano, mes, p, utilizador);
+      return;
+    }
     r.passos[4]!.estado = "A_CORRER";
     r.passos[4]!.detalhe = nada ? "Não há nada por faturar." : "Confirme o resumo abaixo.";
     delete r.passos[4]!.feitos;
@@ -211,6 +218,29 @@ async function preparar(id: string, ano: number, mes: number, utilizador: string
     await r.mudar(passo, "ERRO", erro);
     await prisma.execucao.update({ where: { id }, data: { estado: "FALHOU", resultado: `A faturação NÃO foi emitida: falhou o passo ${passo + 1}.\n\n${erro}`, terminadoEm: new Date() } });
   }
+}
+
+/** Faturação mensal da tarefa agendada: os mesmos 6 passos, sem esperar
+ *  pela confirmação. Fica registada como uma execução (vê-se na página) e
+ *  devolve o resultado em texto. */
+export async function executarFaturacaoAgendada(ano: number, mes: number, quem: string): Promise<string> {
+  const ativa = await execucaoAtiva();
+  if (ativa) throw new Error(`Já há uma faturação/conferência em curso (${ativa.mes}/${ativa.ano}, iniciada por ${ativa.iniciadoPor ?? "alguém"}).`);
+  const registo = new RegistoPassos("");
+  const exec = await prisma.execucao.create({
+    data: { tipo: "FATURACAO_MENSAL", ano, mes, estado: "A_PREPARAR", passos: registo.passos as never, iniciadoPor: quem },
+  });
+  aCorrer.add(exec.id);
+  try {
+    await preparar(exec.id, ano, mes, quem, true);
+  } finally {
+    aCorrer.delete(exec.id);
+  }
+  const fim = await prisma.execucao.findUnique({ where: { id: exec.id } });
+  const passos = (fim?.passos ?? []) as unknown as Passo[];
+  const resumo = [passos[1]?.detalhe, passos[3]?.detalhe, passos[5]?.detalhe].filter(Boolean).join(" ").replace(/\n/g, " ");
+  if (fim?.estado === "FALHOU") throw new Error(fim.resultado ?? "A faturação falhou.");
+  return `Faturação de ${mes}/${ano}: ${resumo}`;
 }
 
 /** Passo 6, depois de confirmado o resumo. */

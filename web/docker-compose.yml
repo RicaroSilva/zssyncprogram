@@ -46,6 +46,11 @@ services:
       ADMIN_LOCAL_LOGIN_USERNAME: ${ADMIN_LOCAL_LOGIN_USERNAME:-}
       ADMIN_LOCAL_LOGIN_PASSWORD_HASH_B64: ${ADMIN_LOCAL_LOGIN_PASSWORD_HASH_B64:-}
       CONFIG_PROPERTIES: /config/config.properties
+      # Agendador das tarefas (dentro do servidor). Horas em hora de Lisboa,
+      # como o agendador em Java. AGENDADOR=false desliga-o aqui.
+      AGENDADOR: ${AGENDADOR:-true}
+      FUSO_HORARIO: ${FUSO_HORARIO:-Europe/Lisbon}
+      TZ: ${FUSO_HORARIO:-Europe/Lisbon}
     # O MESMO config.properties do programa em Java (queries, ZSGO, Cyclos).
     # Fica só nesta VM (tem segredos) — nunca vai para o git.
     volumes:

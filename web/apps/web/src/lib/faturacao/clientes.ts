@@ -3,6 +3,7 @@ import { prisma } from "../db";
 import { descreverErro } from "../erros";
 import { ZsgoApi, type ClienteOrigem } from "../zsgo/api";
 import { CONTINENTE, regiaoDoCodigoPostal } from "../zsgo/regiao";
+import { cfgOu } from "../config";
 import { clientesOrigem } from "./fontes";
 import type { Progresso } from "./progresso";
 
@@ -109,4 +110,30 @@ export async function atualizarClientes(lista: ClienteDesatualizado[], progresso
   }
   progresso(`${atualizados} atualizado(s), ${erros} com erro.`, lista.length, lista.length);
   return { atualizados, erros };
+}
+
+/** Tarefa "Sincronizar clientes novos": cria no ZSGO os clientes pendentes
+ *  da source.clients.query (igual a Main.runClientSync / ClientSyncService). */
+export async function sincronizarClientesNovos(progresso: Progresso): Promise<{ criados: number; erros: number }> {
+  if (cfgOu("sync.clients.enabled", "true").toLowerCase() === "false") {
+    progresso("A sincronização de clientes está desligada (sync.clients.enabled=false).");
+    return { criados: 0, erros: 0 };
+  }
+  const zsgo = new ZsgoApi();
+  progresso("A ler os clientes por sincronizar…");
+  const pendentes = await clientesOrigem("source.clients.query");
+  let criados = 0;
+  let erros = 0;
+  for (const [i, c] of pendentes.entries()) {
+    progresso(`A criar ${c.nome ?? c.id} no ZSGO…`, i, pendentes.length);
+    try {
+      const r = await zsgo.criarCliente(c);
+      await marcarSucesso(c, r.code, r.respostaJson);
+      criados++;
+    } catch (e) {
+      await marcarErroCriar(c.id, `${descreverErro(e)} | Dados enviados: ${JSON.stringify(c)}`);
+      erros++;
+    }
+  }
+  return { criados, erros };
 }

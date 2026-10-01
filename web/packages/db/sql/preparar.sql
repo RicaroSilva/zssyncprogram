@@ -93,6 +93,12 @@ CREATE TABLE IF NOT EXISTS zsgo_tarefas (
     a_correr_desde    TIMESTAMP,
     atualizado_em     TIMESTAMP   NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS zsgo_agendador (
+    id            INTEGER PRIMARY KEY DEFAULT 1,
+    maquina       VARCHAR(120),
+    ultimo_sinal  TIMESTAMP,
+    iniciado_em   TIMESTAMP
+);
 INSERT INTO zsgo_tarefas (codigo, hora) VALUES ('SINCRONIZAR_CLIENTES', '07:00') ON CONFLICT DO NOTHING;
 INSERT INTO zsgo_tarefas (codigo, hora) VALUES ('ATUALIZAR_CLIENTES', '07:30') ON CONFLICT DO NOTHING;
 INSERT INTO zsgo_tarefas (codigo, hora, dia_mes) VALUES ('FATURACAO_MENSAL', '08:00', 1) ON CONFLICT DO NOTHING;

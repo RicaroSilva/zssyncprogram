@@ -65,7 +65,9 @@ por `web/packages/db/sql/preparar.sql`. NUNCA `prisma migrate`/`db push`
 nessa BD. Fases em `web/PLANEAMENTO.md`. Lê o MESMO `config.properties`
 (CONFIG_PROPERTIES) e replica as regras do Java (`web/apps/web/src/lib/
 faturacao/` e `lib/zsgo/`): qualquer mudança de regra de negócio tem de ser
-feita nos dois lados enquanto ambos existirem.
+feita nos dois lados enquanto ambos existirem. O agendador web
+(`lib/tarefas.ts`) partilha `zsgo_tarefas` com o Java; `ultima_execucao` é
+hora de parede de Lisboa (timestamp sem fuso), como o Java grava.
 
 ## Por fazer / pedidos em espera
 

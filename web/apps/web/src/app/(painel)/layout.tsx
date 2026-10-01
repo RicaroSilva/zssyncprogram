@@ -5,15 +5,16 @@ import { pode } from "@/lib/exigir-permissao";
 import type { Recurso } from "@/lib/recursos";
 import { LinkMenu } from "@/components/link-menu";
 
-// Menu do painel — cada entrada só aparece a quem pode consultá-la. As
-// restantes áreas (Tarefas, Utilizadores, Perfis) entram à medida que forem
-// construídas (ver PLANEAMENTO.md).
+// Menu do painel — cada entrada só aparece a quem pode consultá-la.
 const MENU: Array<{ href: string; nome: string; recurso: Recurso; acao?: Acao }> = [
   { href: "/resumo", nome: "Resumo", recurso: "RESUMO" },
   { href: "/faturacao", nome: "Faturação", recurso: "FATURACAO" },
   { href: "/notas-credito", nome: "Notas de crédito", recurso: "FATURACAO" },
   { href: "/clientes", nome: "Clientes", recurso: "CLIENTES" },
   { href: "/historico", nome: "Histórico", recurso: "HISTORICO" },
+  { href: "/tarefas", nome: "Tarefas", recurso: "TAREFAS" },
+  { href: "/utilizadores", nome: "Utilizadores", recurso: "UTILIZADORES" },
+  { href: "/perfis", nome: "Perfis", recurso: "PERFIS" },
   { href: "/diagnostico", nome: "Diagnóstico ZSGO", recurso: "FATURACAO", acao: "editar" },
 ];
 

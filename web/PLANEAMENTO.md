@@ -14,8 +14,9 @@ regras de negócio já validadas (ver `../CLAUDE.md`).
   `packages/db/sql/preparar.sql`).
 - **Login igual ao financial**: Keycloak OIDC + acesso de emergência,
   sessões em BD, perfis × recursos, auditoria encadeada por hash.
-- **Sem worker/Redis** (como o financial). As tarefas agendadas vão correr
-  num pequeno container `cron` que chama uma rota interna protegida.
+- **Sem worker/Redis** (como o financial). O agendador corre dentro do
+  próprio servidor (`instrumentation.ts` chama de 30 em 30 s uma rota
+  interna protegida por um segredo gerado no arranque).
 - O Java e a web podem correr em paralelo durante a transição — usam as
   mesmas tabelas e as mesmas regras (nunca repetir um POST ao ZSGO sem
   resposta; referência `LP-cliente-origem-AAAAMM`; localizador de faturas).
@@ -27,7 +28,7 @@ regras de negócio já validadas (ver `../CLAUDE.md`).
 | 1 | Monorepo, tokens de design, login (Keycloak + emergência), perfis, auditoria; Resumo, Faturação (lista + detalhe), Clientes e Histórico — só leitura | ✅ |
 | 2 | Cliente ZSGO e Cyclos em TypeScript (criar/atualizar clientes, criar faturas e notas de crédito, PDF, `invoicenumber`), queries do `config.properties`; **Gerar faturação** com a janela de passos (pré-análise → criar clientes → verificar alterações → atualizar → resumo → emitir), localizador de faturas "Verificar no ZSGO" | ✅ |
 | 3 | "Verificar no ZSGO" à mão (associar nº / autorizar recriar) no detalhe da fatura, documento do ZSGO no detalhe, Conferir com o ZSGO (segundo plano) + filtro "Com diferença", página de notas de crédito, Diagnóstico do ZSGO | ✅ |
-| 4 | Tarefas agendadas (container `cron`) e páginas Utilizadores/Perfis | ⏳ |
+| 4 | Tarefas agendadas (agendador dentro do servidor, mesma tabela e mesma reserva do Java, hora de Lisboa) e páginas Utilizadores/Perfis | ✅ |
 | 5 | Faturação ocasional (produto `ocasionalTransactions`, uma fatura por pagamento, diária) — quando o utilizador especificar | ⏳ |
 | 6 | Desligar o programa em Java | ⏳ |
 

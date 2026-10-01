@@ -87,9 +87,10 @@ export async function linhasEstornos(ano: number, mes: number): Promise<LinhaEst
   }));
 }
 
-/** Dados atuais dos clientes no Cyclos (source.clients.verify.query). */
-export async function clientesOrigem(): Promise<ClienteOrigem[]> {
-  const linhas = await consultar("source.clients.verify.query");
+/** Dados atuais dos clientes no Cyclos: todos os já sincronizados
+ *  (source.clients.verify.query) ou só os pendentes (source.clients.query). */
+export async function clientesOrigem(chave: "source.clients.verify.query" | "source.clients.query" = "source.clients.verify.query"): Promise<ClienteOrigem[]> {
+  const linhas = await consultar(chave);
   return linhas.map((l) => ({
     id: String(l.id),
     nome: texto(l.nome),
