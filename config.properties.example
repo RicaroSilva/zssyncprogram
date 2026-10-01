@@ -402,3 +402,6 @@ creditnote.query=\
 # endereço do PDF. {url} = endereço final do link, {token} = último bocado.
 # Sem isto, a aplicação experimenta {url}/download, {url}/pdf, {url}.pdf…
 #cegid.download.modelo_pdf={url}/download
+# Servidores do Cegid onde o mesmo token também pode estar (experimenta-os
+# quando o link guardado não dá o PDF, com e sem /rus/public-rus):
+#cegid.download.servidores=app.cloudware.pt,app1.business-pt.cegid.cloud,app3.business-pt.cegid.cloud

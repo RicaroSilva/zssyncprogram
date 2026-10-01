@@ -148,7 +148,7 @@ function chaveDe(doc: Pendente, extensao: string): string {
 
 async function descarregarUm(armazenamento: Armazenamento, doc: Pendente): Promise<boolean> {
   try {
-    const { dados, tipo } = await obterDocumento(doc.document_cw_url);
+    const { dados, tipo } = await obterComAlternativas(doc.document_cw_url);
     const extensao = tipo.includes("pdf") ? "pdf" : tipo.includes("xml") ? "xml" : "bin";
     const chave = chaveDe(doc, extensao);
     await armazenamento.guardar(chave, dados, tipo);
@@ -207,7 +207,7 @@ function aplicarModelo(modelo: string, urlFinal: string): string {
 const pedir = (u: string) => fetch(u, { redirect: "follow", signal: AbortSignal.timeout(90_000), headers: { "user-agent": "Mozilla/5.0 (faturacao-web; copia de documentos)" } });
 const ehPdf = (d: Buffer) => d.subarray(0, 5).toString("latin1") === "%PDF-";
 
-async function obterDocumento(url: string, passos?: string[], guardarHtml?: (html: string, urlFinal: string) => void): Promise<{ dados: Buffer; tipo: string }> {
+async function obterDocumento(url: string, passos?: string[], guardarHtml?: (html: string, urlFinal: string) => void, comPalpites = true): Promise<{ dados: Buffer; tipo: string }> {
   let alvo = linkDireto(url);
   const visitados = new Set<string>();
   // Até 3 saltos: o link público do Cegid pode redirecionar para o Google, ou
@@ -231,7 +231,7 @@ async function obterDocumento(url: string, passos?: string[], guardarHtml?: (htm
     }
     if (/accounts\.google\.com|ServiceLogin/i.test(html)) throw new Error("O link pede login no Google (o documento já não é público).");
     // Página do visualizador (ex.: Cegid …/rus/public-rus/public_links/link/…): experimentar os endereços de download.
-    if (palpite.falhasSeguidas < 20 || cfgOu("cegid.download.modelo_pdf", null)) {
+    if (comPalpites && (palpite.falhasSeguidas < 20 || cfgOu("cegid.download.modelo_pdf", null))) {
       for (const modelo of modelosPalpite()) {
         const candidato = aplicarModelo(modelo, urlFinal);
         if (visitados.has(candidato)) continue;
@@ -254,6 +254,75 @@ async function obterDocumento(url: string, passos?: string[], guardarHtml?: (htm
     throw new Error(`O link não devolveu um PDF (veio ${tipo || "tipo desconhecido"}, ${dados.length} bytes): é a página do visualizador; falta saber o endereço do PDF (cegid.download.modelo_pdf).`);
   }
   throw new Error("O link não devolveu um PDF (demasiados saltos).");
+}
+
+/**
+ * Os links do Cegid têm o mesmo token em vários servidores: o Cyclos guardou
+ * https://app.cloudware.pt/public_links/link/TOKEN, que hoje redireciona para
+ * https://app1.business-pt.cegid.cloud/rus/public-rus/public_links/link/TOKEN
+ * (e há também o app3). Se o link guardado não der o PDF, experimenta o
+ * mesmo token nos outros servidores (cegid.download.servidores) e nos dois
+ * caminhos; o que funcionar fica memorizado e passa a ser o primeiro.
+ */
+const ga = globalThis as unknown as { __alternativaCegid?: { modelo: string | null; falhasSeguidas: number } };
+const alternativa = (ga.__alternativaCegid ??= { modelo: null, falhasSeguidas: 0 });
+
+function modelosAlternativos(): string[] {
+  const servidores = cfgOu("cegid.download.servidores", "app.cloudware.pt,app1.business-pt.cegid.cloud,app3.business-pt.cegid.cloud")
+    .split(",")
+    .map((x) => x.trim().replace(/\/+$/, ""))
+    .filter(Boolean)
+    .map((x) => (/^https?:\/\//.test(x) ? x : `https://${x}`));
+  return servidores.flatMap((h) => [`${h}/public_links/link/{token}`, `${h}/rus/public-rus/public_links/link/{token}`]);
+}
+
+async function obterComAlternativas(url: string, passos?: string[], guardarHtml?: (html: string, urlFinal: string) => void): Promise<{ dados: Buffer; tipo: string }> {
+  const token = url.match(/\/public_links\/link\/([^/?#]+)/)?.[1];
+  if (!token) return obterDocumento(url, passos, guardarHtml);
+  const tentados = new Set<string>();
+  const experimentar = async (u: string, palpites: boolean) => {
+    tentados.add(u);
+    return obterDocumento(u, passos, guardarHtml, palpites);
+  };
+  // 1.º o servidor que já funcionou noutras faturas.
+  if (alternativa.modelo) {
+    const u = alternativa.modelo.replace("{token}", token);
+    try {
+      return await experimentar(u, false);
+    } catch (e) {
+      passos?.push(`(servidor memorizado falhou: ${descreverErro(e).slice(0, 120)})`);
+    }
+  }
+  // 2.º o link tal como está no Cyclos.
+  let primeiroErro: unknown;
+  try {
+    if (!tentados.has(url)) return await experimentar(url, false);
+  } catch (e) {
+    primeiroErro = e;
+  }
+  // 3.º o mesmo token nos outros servidores (até 20 faturas seguidas sem sucesso, para não multiplicar pedidos).
+  if (alternativa.falhasSeguidas < 20) {
+    for (const modelo of modelosAlternativos()) {
+      const u = modelo.replace("{token}", token);
+      if (tentados.has(u)) continue;
+      try {
+        const r = await experimentar(u, false);
+        alternativa.modelo = modelo;
+        alternativa.falhasSeguidas = 0;
+        passos?.push(`funcionou noutro servidor: ${modelo.replace("{token}", "…")}`);
+        return r;
+      } catch {
+        /* experimenta o seguinte */
+      }
+    }
+    alternativa.falhasSeguidas++;
+  }
+  // 4.º os endereços de download habituais a partir do link original.
+  try {
+    return await obterDocumento(url, passos, guardarHtml, true);
+  } catch (e) {
+    throw primeiroErro ?? e;
+  }
 }
 
 /** Endereços que aparecem numa página (scripts, ligações, chamadas a APIs) — para descobrir onde está o PDF. */
@@ -302,7 +371,7 @@ export async function testarDocumento(mpinvId?: number): Promise<{ ok: boolean; 
   const passos: string[] = [];
   let pagina: { html: string; urlFinal: string } | null = null;
   try {
-    const { dados, tipo } = await obterDocumento(doc.document_cw_url, passos, (html, urlFinal) => (pagina ??= { html, urlFinal }));
+    const { dados, tipo } = await obterComAlternativas(doc.document_cw_url, passos, (html, urlFinal) => (pagina ??= { html, urlFinal }));
     return { ok: true, mpinvId: doc.mpinv_id, passos, enderecos: [], temPagina: false, resultado: `Funciona: veio um ${tipo.includes("pdf") ? "PDF" : tipo} com ${Math.round(dados.length / 1024)} KB.` };
   } catch (e) {
     const p = pagina as { html: string; urlFinal: string } | null;
