@@ -204,7 +204,69 @@ function aplicarModelo(modelo: string, urlFinal: string): string {
   return modelo.replace(/\{url\}/g, semQuery).replace(/\{token\}/g, token);
 }
 
-const pedir = (u: string) => fetch(u, { redirect: "follow", signal: AbortSignal.timeout(90_000), headers: { "user-agent": "Mozilla/5.0 (faturacao-web; copia de documentos)" } });
+const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** GET com espera quando o Cegid responde 429 (demasiados pedidos): respeita o Retry-After. */
+async function pedir(u: string, passos?: string[]): Promise<Response> {
+  for (let tentativa = 1; ; tentativa++) {
+    const r = await fetch(u, { redirect: "follow", signal: AbortSignal.timeout(90_000), headers: { "user-agent": "Mozilla/5.0 (faturacao-web; copia de documentos)" } });
+    if (r.status !== 429 || tentativa >= 4) return r;
+    const segundos = Math.min(120, Number(r.headers.get("retry-after")) || 10 * tentativa);
+    passos?.push(`429 (demasiados pedidos) — espero ${segundos} s e tento outra vez`);
+    await r.arrayBuffer().catch(() => {});
+    await espera(segundos * 1000);
+  }
+}
+
+/**
+ * A página pública do Cegid (…/rus/public-rus/public_links/link/…) é o
+ * visualizador; o PDF vem de um destes endereços que estão na página:
+ *   …/public-file/<JWT archive>          ficheiro público (o PDF, ou o logótipo)
+ *   …/public_links/link/<JWT action:job> pede ao Cegid para gerar o documento
+ * Experimenta-os por esta ordem; se o "job" responder com outra página ou com
+ * JSON, procura lá o ficheiro (e espera um pouco se ainda estiver a gerar).
+ */
+function enderecosCegid(texto: string, base: string, visitados: Set<string>): string[] {
+  const todos = new Set<string>();
+  const t = texto.replace(/\\\//g, "/"); // JSON escreve as barras como \/
+  for (const m of t.matchAll(/(?:https?:\/\/[^"'`\s<>\\]+)?\/(?:public-file|rus\/public-rus\/public_links\/link|public_links\/link)\/eyJ[A-Za-z0-9_.-]+/g)) {
+    try {
+      todos.add(new URL(m[0], base).toString());
+    } catch {
+      /* ignora */
+    }
+  }
+  const lista = [...todos].filter((u) => !visitados.has(u));
+  return [...lista.filter((u) => u.includes("/public-file/")), ...lista.filter((u) => !u.includes("/public-file/"))];
+}
+
+async function seguirEnderecosCegid(texto: string, base: string, passos: string[] | undefined, visitados: Set<string>, nivel = 0): Promise<{ dados: Buffer; tipo: string } | null> {
+  if (nivel > 2) return null;
+  for (const u of enderecosCegid(texto, base, visitados)) {
+    visitados.add(u);
+    const ehJob = !u.includes("/public-file/");
+    for (let vez = 0; vez < (ehJob ? 3 : 1); vez++) {
+      if (vez > 0) await espera(3000);
+      let r: Response;
+      try {
+        r = await pedir(u, passos);
+      } catch (e) {
+        passos?.push(`${u.slice(0, 90)}… → ${descreverErro(e).slice(0, 100)}`);
+        break;
+      }
+      const dados = Buffer.from(await r.arrayBuffer());
+      const tipo = (r.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
+      passos?.push(`${ehJob ? "gerar documento (job)" : "ficheiro público"} ${u.slice(0, 90)}… → ${r.status} ${tipo || "?"} (${dados.length} bytes)`);
+      if (!r.ok) break;
+      if (ehPdf(dados)) return { dados, tipo: "application/pdf" };
+      if (tipo.startsWith("image/")) break; // era o logótipo
+      // Outra página ou JSON: procura lá o ficheiro.
+      const achado = await seguirEnderecosCegid(dados.toString("utf-8"), r.url || u, passos, visitados, nivel + 1);
+      if (achado) return achado;
+    }
+  }
+  return null;
+}
 const ehPdf = (d: Buffer) => d.subarray(0, 5).toString("latin1") === "%PDF-";
 
 async function obterDocumento(url: string, passos?: string[], guardarHtml?: (html: string, urlFinal: string) => void, comPalpites = true): Promise<{ dados: Buffer; tipo: string }> {
@@ -214,7 +276,7 @@ async function obterDocumento(url: string, passos?: string[], guardarHtml?: (htm
   // devolver uma página com o PDF lá dentro (iframe/embed/ligação).
   for (let salto = 0; salto < 3; salto++) {
     visitados.add(alvo);
-    const r = await pedir(alvo);
+    const r = await pedir(alvo, passos);
     const dados = Buffer.from(await r.arrayBuffer());
     const tipo = (r.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
     const urlFinal = r.url || alvo;
@@ -224,6 +286,9 @@ async function obterDocumento(url: string, passos?: string[], guardarHtml?: (htm
     if (tipo.includes("xml") && !tipo.includes("html")) return { dados, tipo };
     const html = dados.toString("utf-8");
     guardarHtml?.(html, urlFinal);
+    visitados.add(urlFinal);
+    const doCegid = await seguirEnderecosCegid(html, urlFinal, passos, visitados);
+    if (doCegid) return doCegid;
     const seguinte = urlConfirmacaoDrive(html) ?? urlPdfNaPagina(html, urlFinal);
     if (seguinte && !visitados.has(seguinte)) {
       alvo = seguinte;
@@ -237,7 +302,7 @@ async function obterDocumento(url: string, passos?: string[], guardarHtml?: (htm
         if (visitados.has(candidato)) continue;
         visitados.add(candidato);
         try {
-          const rc = await pedir(candidato);
+          const rc = await pedir(candidato, passos);
           const dc = Buffer.from(await rc.arrayBuffer());
           passos?.push(`palpite ${modelo} → ${rc.status} ${(rc.headers.get("content-type") ?? "?").split(";")[0]} (${dc.length} bytes)`);
           if (rc.ok && ehPdf(dc)) {
