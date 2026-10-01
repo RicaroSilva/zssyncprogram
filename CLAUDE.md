@@ -71,6 +71,15 @@ hora de parede de Lisboa (timestamp sem fuso), como o Java grava.
 Menu ZSGO (`app/(painel)/zsgo/`, `lib/zsgo/recursos.ts`): gerado a partir da
 especificação `web/docs/zsgo-api-1.3.yaml` (→ `lib/zsgo/gerado/especificacao.json`
 via `web/scripts-zsgo-spec.py`); só faz operações que existem na especificação.
+Histórico Cegid (`app/(painel)/cegid/`, `lib/cegid/`): a integração antiga
+com o Cegid/Cloudware deixou `lp_cloudware_monthly_processing_invoices`
+(user_id, year, month, document_cw_number, document_cw_url,
+related_to_user_id = fatura emitida a outra pessoa), `..._invoice_lines`
+(rubric_code, total_amount_with_taxes), `lp_cloudware_rubrics_mappings` e
+`lp_cloudware_users_mappings` (user_id → cw_id). SÓ LEITURA nessas tabelas.
+Os PDFs copiam-se para o S3 do SeaweedFS (`cegid.s3.*`) antes de a licença
+acabar; estado em `zsgo_web_cegid_documento`. Os links públicos do Cegid são
+`app1.business-pt.cegid.cloud/rus/public-rus/public_links/link/...`.
 
 ## Por fazer / pedidos em espera
 

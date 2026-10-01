@@ -207,3 +207,18 @@ CREATE TABLE IF NOT EXISTS zsgo_web_execucao (
     terminado_em   TIMESTAMP(3)
 );
 CREATE INDEX IF NOT EXISTS zsgo_web_execucao_iniciado_idx ON zsgo_web_execucao (iniciado_em DESC);
+
+-- Cópias dos documentos do Cegid (lp_cloudware_monthly_processing_invoices),
+-- descarregadas antes de a licença acabar e guardadas no S3 (SeaweedFS).
+CREATE TABLE IF NOT EXISTS zsgo_web_cegid_documento (
+    mpinv_id       INTEGER      PRIMARY KEY,
+    estado         TEXT         NOT NULL,
+    chave          TEXT,
+    tamanho        BIGINT,
+    sha256         TEXT,
+    tipo           TEXT,
+    erro           TEXT,
+    tentativas     INTEGER      NOT NULL DEFAULT 0,
+    atualizado_em  TIMESTAMP(3) NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS zsgo_web_cegid_documento_estado_idx ON zsgo_web_cegid_documento (estado);

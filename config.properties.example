@@ -381,3 +381,20 @@ creditnote.query=\
     AND date_trunc('month', orig.date) <> date_trunc('month', cb.date) \
     AND (cn.chargeback_id IS NULL OR cn.status = 'ERRO') \
   ORDER BY cliente_id ASC
+# ============================================================
+# HISTÓRICO CEGID (só na aplicação web)
+# ============================================================
+# Onde guardar as cópias dos PDFs das faturas antigas do Cegid (tabelas
+# lp_cloudware_*), descarregadas pelo menu "Histórico Cegid" antes de a
+# licença acabar. S3 compatível (SeaweedFS, MinIO, AWS…):
+#cegid.s3.endpoint=http://seaweedfs:8333
+#cegid.s3.bucket=faturas-cegid
+#cegid.s3.access_key=
+#cegid.s3.secret_key=
+#cegid.s3.region=us-east-1
+#cegid.s3.prefixo=cegid/
+# Sem S3, numa pasta:
+#cegid.pasta=C:\\faturacao\\cegid
+# Quantos documentos ao mesmo tempo e pausa entre cada um (para o Cegid não bloquear):
+#cegid.download.paralelos=3
+#cegid.download.pausa_ms=200

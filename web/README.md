@@ -108,6 +108,23 @@ Outras ferramentas na Faturação:
 - **Notas de crédito** e **Diagnóstico ZSGO** (resposta em bruto do ZSGO,
   para ajustar a leitura ao formato real).
 
+## Histórico Cegid
+
+O menu **Histórico Cegid** mostra as faturas da integração antiga com o
+Cegid (Cloudware), lidas diretamente das tabelas `lp_cloudware_*` da base de
+dados do Cyclos (só leitura): por mês ou todas, pesquisa por cliente ou nº,
+detalhe com as linhas e a descrição das rubricas, destinatário
+(`related_to_user_id`) e as que ficaram mal geradas.
+
+**Cópia dos documentos:** "Descarregar todos" vai buscar o PDF de cada fatura
+ao link do Cegid (`document_cw_url`; segue redirecionamentos, links do Google
+Drive e páginas com o PDF embutido) e guarda-o no S3 (SeaweedFS) indicado em
+`cegid.s3.*` no `config.properties` (ou numa pasta, `cegid.pasta`), como
+`cegid/AAAA/MM/<user_id>-<nº>-<id>.pdf`. O que já foi guardado fica em
+`zsgo_web_cegid_documento` (tamanho e SHA-256): pode parar-se e continuar.
+"Testar um documento" mostra o que o link devolve sem guardar nada. Depois
+de guardado, a aplicação abre a cópia e não o link do Cegid.
+
 ## ZSGO — gestão direta
 
 O menu **ZSGO** dá acesso a tudo o que a API do ZSGO (versão 1.3) permite,

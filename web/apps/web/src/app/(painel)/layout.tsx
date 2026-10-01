@@ -11,6 +11,7 @@ const MENU: Array<{ href: string; nome: string; recurso: Recurso; acao?: Acao }>
   { href: "/faturacao", nome: "Faturação", recurso: "FATURACAO" },
   { href: "/notas-credito", nome: "Notas de crédito", recurso: "FATURACAO" },
   { href: "/clientes", nome: "Clientes", recurso: "CLIENTES" },
+  { href: "/cegid", nome: "Histórico Cegid", recurso: "FATURACAO" },
   { href: "/zsgo", nome: "ZSGO", recurso: "ZSGO" },
   { href: "/historico", nome: "Histórico", recurso: "HISTORICO" },
   { href: "/tarefas", nome: "Tarefas", recurso: "TAREFAS" },
