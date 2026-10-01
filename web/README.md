@@ -167,8 +167,8 @@ primeiro login liga a conta Keycloak automaticamente.
 Para entrar sem Keycloak (ex.: enquanto o client não está criado):
 
 ```bash
-docker compose run --rm --entrypoint node web -e \
-  'require("argon2").hash(process.argv[1],{type:2}).then(h=>console.log(Buffer.from(h).toString("base64")))' 'A-SUA-SENHA'
+docker compose run --rm --entrypoint pnpm web --filter @faturacao/web hash-senha 'A-SUA-SENHA'
+# ou, sem Docker: pnpm --filter @faturacao/web hash-senha "A-SUA-SENHA"
 ```
 
 Pôr o resultado em `ADMIN_LOCAL_LOGIN_PASSWORD_HASH_B64`, o email em
