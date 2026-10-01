@@ -8,6 +8,14 @@ type Progresso = Awaited<ReturnType<typeof progressoDownloadAction>>;
 
 const n = (x: number) => new Intl.NumberFormat("pt-PT").format(x);
 
+function duracao(minutos: number): string {
+  if (!Number.isFinite(minutos)) return "—";
+  if (minutos < 60) return `${Math.max(1, Math.round(minutos))} min`;
+  const horas = minutos / 60;
+  if (horas < 48) return `${Math.floor(horas)} h ${Math.round(minutos % 60)} min`;
+  return `${Math.round(horas / 24)} dias`;
+}
+
 /** Cópia de segurança dos documentos do Cegid para o S3: progresso, iniciar/continuar, parar. */
 export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Progresso; podeIniciar: boolean; destino: string | null }) {
   const [p, setP] = useState(inicial);
@@ -31,6 +39,9 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
       setP(await progressoDownloadAction());
     });
 
+  // Velocidade desta execução e tempo que falta (com o ritmo atual).
+  const minutos = estado.iniciadoEm ? (Date.now() - new Date(estado.iniciadoEm).getTime()) / 60000 : 0;
+  const porMinuto = estado.aCorrer && minutos > 0.2 ? estado.feitosNestaExecucao / minutos : 0;
   const pct = contagem.total ? Math.floor((contagem.guardados / contagem.total) * 1000) / 10 : 0;
   const falta = Math.max(0, contagem.total - contagem.guardados - contagem.comErro);
 
@@ -96,6 +107,12 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
           {n(falta)} por descarregar · <span className={contagem.comErro ? "font-semibold text-destructive" : ""}>{n(contagem.comErro)} com erro</span>
           {contagem.semLink ? ` · ${n(contagem.semLink)} sem link no Cegid` : ""}
         </p>
+        {porMinuto > 0 && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            Ritmo: <b className="font-semibold text-foreground">{n(Math.round(porMinuto))} por minuto</b> · faltam cerca de{" "}
+            <b className="font-semibold text-foreground">{duracao(falta / porMinuto)}</b>
+          </p>
+        )}
       </div>
 
       {(estado.aCorrer || estado.ultimaMensagem) && (

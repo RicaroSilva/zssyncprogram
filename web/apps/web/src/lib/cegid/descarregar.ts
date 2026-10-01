@@ -92,8 +92,8 @@ interface Pendente {
 }
 
 async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
-  const paralelos = Math.max(1, Math.min(10, cfgInt("cegid.download.paralelos", 3)));
-  const pausa = Math.max(0, cfgInt("cegid.download.pausa_ms", 200));
+  const paralelos = Math.max(1, Math.min(20, cfgInt("cegid.download.paralelos", 6)));
+  const pausa = Math.max(0, cfgInt("cegid.download.pausa_ms", 0));
   let errosSeguidos = 0;
   let paradoPorErros = false;
   let ultimoId = 0;
@@ -110,7 +110,7 @@ async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
         LEFT JOIN zsgo_web_cegid_documento d ON d.mpinv_id = i.mpinv_id
         WHERE i.mpinv_id > ${ultimoId} AND i.document_cw_url IS NOT NULL AND i.document_cw_url <> ''
           AND (d.mpinv_id IS NULL OR (${repetirErros} AND d.estado = 'ERRO'))
-        ORDER BY i.mpinv_id LIMIT 200`;
+        ORDER BY i.mpinv_id LIMIT 1000`;
       if (lote.length === 0) {
         estado.ultimaMensagem = estado.errosNestaExecucao
           ? `Terminado: ${estado.feitosNestaExecucao} guardado(s), ${estado.errosNestaExecucao} com erro (pode tentar de novo os que falharam).`
@@ -207,12 +207,19 @@ function aplicarModelo(modelo: string, urlFinal: string): string {
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /** GET com espera quando o Cegid responde 429 (demasiados pedidos): respeita o Retry-After. */
+/** Quando o Cegid responde 429, TODOS os pedidos esperam até esta hora (e não só o que recebeu o 429). */
+const gr = globalThis as unknown as { __travaoCegid?: { ate: number } };
+const travao = (gr.__travaoCegid ??= { ate: 0 });
+
 async function pedir(u: string, passos?: string[]): Promise<Response> {
   for (let tentativa = 1; ; tentativa++) {
+    const falta = travao.ate - Date.now();
+    if (falta > 0) await espera(falta);
     const r = await fetch(u, { redirect: "follow", signal: AbortSignal.timeout(90_000), headers: { "user-agent": "Mozilla/5.0 (faturacao-web; copia de documentos)" } });
     if (r.status !== 429 || tentativa >= 4) return r;
     const segundos = Math.min(120, Number(r.headers.get("retry-after")) || 10 * tentativa);
     passos?.push(`429 (demasiados pedidos) — espero ${segundos} s e tento outra vez`);
+    travao.ate = Math.max(travao.ate, Date.now() + segundos * 1000);
     await r.arrayBuffer().catch(() => {});
     await espera(segundos * 1000);
   }
@@ -240,10 +247,28 @@ function enderecosCegid(texto: string, base: string, visitados: Set<string>): st
   return [...lista.filter((u) => u.includes("/public-file/")), ...lista.filter((u) => !u.includes("/public-file/"))];
 }
 
+/** Ficheiros públicos que já se viu serem imagens (o logótipo da empresa repete-se em todas as faturas). */
+const gi = globalThis as unknown as { __imagensCegid?: Set<string> };
+const imagensConhecidas = (gi.__imagensCegid ??= new Set<string>());
+
+/** O id do ficheiro dentro do JWT de um …/public-file/<JWT> (sem verificar a assinatura: só para reconhecer o logótipo). */
+function idArquivo(u: string): string | null {
+  const jwt = u.match(/\/public-file\/([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)/)?.[1];
+  if (!jwt) return null;
+  try {
+    const dados = JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString("utf-8")) as { archive?: { id?: string; entity_id?: string } };
+    return dados.archive?.id ? `${dados.archive.entity_id ?? ""}:${dados.archive.id}` : null;
+  } catch {
+    return null;
+  }
+}
+
 async function seguirEnderecosCegid(texto: string, base: string, passos: string[] | undefined, visitados: Set<string>, nivel = 0): Promise<{ dados: Buffer; tipo: string } | null> {
   if (nivel > 2) return null;
   for (const u of enderecosCegid(texto, base, visitados)) {
     visitados.add(u);
+    const arquivo = idArquivo(u);
+    if (arquivo && imagensConhecidas.has(arquivo)) continue; // já se sabe que é o logótipo
     const ehJob = !u.includes("/public-file/");
     for (let vez = 0; vez < (ehJob ? 3 : 1); vez++) {
       if (vez > 0) await espera(3000);
@@ -259,7 +284,10 @@ async function seguirEnderecosCegid(texto: string, base: string, passos: string[
       passos?.push(`${ehJob ? "gerar documento (job)" : "ficheiro público"} ${u.slice(0, 90)}… → ${r.status} ${tipo || "?"} (${dados.length} bytes)`);
       if (!r.ok) break;
       if (ehPdf(dados)) return { dados, tipo: "application/pdf" };
-      if (tipo.startsWith("image/")) break; // era o logótipo
+      if (tipo.startsWith("image/")) {
+        if (arquivo) imagensConhecidas.add(arquivo); // era o logótipo: não voltar a pedir
+        break;
+      }
       // Outra página ou JSON: procura lá o ficheiro.
       const achado = await seguirEnderecosCegid(dados.toString("utf-8"), r.url || u, passos, visitados, nivel + 1);
       if (achado) return achado;
