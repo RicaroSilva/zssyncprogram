@@ -398,3 +398,7 @@ creditnote.query=\
 # Quantos documentos ao mesmo tempo e pausa entre cada um (para o Cegid não bloquear):
 #cegid.download.paralelos=3
 #cegid.download.pausa_ms=200
+# Quando o link do Cegid abre a página do visualizador (e não o PDF), o
+# endereço do PDF. {url} = endereço final do link, {token} = último bocado.
+# Sem isto, a aplicação experimenta {url}/download, {url}/pdf, {url}.pdf…
+#cegid.download.modelo_pdf={url}/download

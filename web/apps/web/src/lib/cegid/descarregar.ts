@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { prisma } from "../db";
-import { cfgInt } from "../config";
+import { cfgInt, cfgOu } from "../config";
 import { descreverErro } from "../erros";
 import { armazenamentoConfigurado, prefixoChaves, type Armazenamento } from "./armazenamento";
 
@@ -185,30 +185,93 @@ export function linkDireto(url: string): string {
   return url;
 }
 
-async function obterDocumento(url: string, passos?: string[]): Promise<{ dados: Buffer; tipo: string }> {
+/** Palpite de endereço do PDF que funcionou (para tentar primeiro nas faturas seguintes). */
+const gp = globalThis as unknown as { __palpiteCegid?: { modelo: string | null; falhasSeguidas: number } };
+const palpite = (gp.__palpiteCegid ??= { modelo: null, falhasSeguidas: 0 });
+
+/** Endereços a experimentar quando o link devolve a página do visualizador em vez do PDF.
+ *  {url} = endereço final (depois dos redirecionamentos), {token} = último bocado do caminho. */
+function modelosPalpite(): string[] {
+  const configurado = cfgOu("cegid.download.modelo_pdf", null);
+  const habituais = ["{url}/download", "{url}/pdf", "{url}.pdf", "{url}?download=1", "{url}?format=pdf", "{url}?type=pdf"];
+  const lista = configurado ? [configurado] : [...(palpite.modelo ? [palpite.modelo] : []), ...habituais.filter((m) => m !== palpite.modelo)];
+  return lista;
+}
+
+function aplicarModelo(modelo: string, urlFinal: string): string {
+  const semQuery = urlFinal.split(/[?#]/)[0]!.replace(/\/+$/, "");
+  const token = semQuery.split("/").pop() ?? "";
+  return modelo.replace(/\{url\}/g, semQuery).replace(/\{token\}/g, token);
+}
+
+const pedir = (u: string) => fetch(u, { redirect: "follow", signal: AbortSignal.timeout(90_000), headers: { "user-agent": "Mozilla/5.0 (faturacao-web; copia de documentos)" } });
+const ehPdf = (d: Buffer) => d.subarray(0, 5).toString("latin1") === "%PDF-";
+
+async function obterDocumento(url: string, passos?: string[], guardarHtml?: (html: string, urlFinal: string) => void): Promise<{ dados: Buffer; tipo: string }> {
   let alvo = linkDireto(url);
   const visitados = new Set<string>();
   // Até 3 saltos: o link público do Cegid pode redirecionar para o Google, ou
   // devolver uma página com o PDF lá dentro (iframe/embed/ligação).
   for (let salto = 0; salto < 3; salto++) {
     visitados.add(alvo);
-    const r = await fetch(alvo, { redirect: "follow", signal: AbortSignal.timeout(90_000), headers: { "user-agent": "Mozilla/5.0 (faturacao-web; copia de documentos)" } });
+    const r = await pedir(alvo);
     const dados = Buffer.from(await r.arrayBuffer());
     const tipo = (r.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
-    passos?.push(`${alvo.slice(0, 120)} → ${r.status} ${tipo || "?"} (${dados.length} bytes)${r.url !== alvo ? ` · redirecionou para ${r.url.slice(0, 120)}` : ""}`);
+    const urlFinal = r.url || alvo;
+    passos?.push(`${alvo.slice(0, 120)} → ${r.status} ${tipo || "?"} (${dados.length} bytes)${urlFinal !== alvo ? ` · redirecionou para ${urlFinal.slice(0, 120)}` : ""}`);
     if (!r.ok) throw new Error(`O link respondeu ${r.status} ${r.statusText}`);
-    if (dados.subarray(0, 5).toString("latin1") === "%PDF-") return { dados, tipo: "application/pdf" };
+    if (ehPdf(dados)) return { dados, tipo: "application/pdf" };
     if (tipo.includes("xml") && !tipo.includes("html")) return { dados, tipo };
     const html = dados.toString("utf-8");
-    const seguinte = urlConfirmacaoDrive(html) ?? urlPdfNaPagina(html, r.url || alvo);
+    guardarHtml?.(html, urlFinal);
+    const seguinte = urlConfirmacaoDrive(html) ?? urlPdfNaPagina(html, urlFinal);
     if (seguinte && !visitados.has(seguinte)) {
       alvo = seguinte;
       continue;
     }
     if (/accounts\.google\.com|ServiceLogin/i.test(html)) throw new Error("O link pede login no Google (o documento já não é público).");
-    throw new Error(`O link não devolveu um PDF (veio ${tipo || "tipo desconhecido"}, ${dados.length} bytes).`);
+    // Página do visualizador (ex.: Cegid …/rus/public-rus/public_links/link/…): experimentar os endereços de download.
+    if (palpite.falhasSeguidas < 20 || cfgOu("cegid.download.modelo_pdf", null)) {
+      for (const modelo of modelosPalpite()) {
+        const candidato = aplicarModelo(modelo, urlFinal);
+        if (visitados.has(candidato)) continue;
+        visitados.add(candidato);
+        try {
+          const rc = await pedir(candidato);
+          const dc = Buffer.from(await rc.arrayBuffer());
+          passos?.push(`palpite ${modelo} → ${rc.status} ${(rc.headers.get("content-type") ?? "?").split(";")[0]} (${dc.length} bytes)`);
+          if (rc.ok && ehPdf(dc)) {
+            palpite.modelo = modelo;
+            palpite.falhasSeguidas = 0;
+            return { dados: dc, tipo: "application/pdf" };
+          }
+        } catch (e) {
+          passos?.push(`palpite ${modelo} → ${descreverErro(e).slice(0, 120)}`);
+        }
+      }
+      palpite.falhasSeguidas++;
+    }
+    throw new Error(`O link não devolveu um PDF (veio ${tipo || "tipo desconhecido"}, ${dados.length} bytes): é a página do visualizador; falta saber o endereço do PDF (cegid.download.modelo_pdf).`);
   }
   throw new Error("O link não devolveu um PDF (demasiados saltos).");
+}
+
+/** Endereços que aparecem numa página (scripts, ligações, chamadas a APIs) — para descobrir onde está o PDF. */
+function enderecosNaPagina(html: string, base: string): string[] {
+  const achados = new Set<string>();
+  for (const m of html.matchAll(/(?:src|href|action)\s*=\s*["']([^"'#][^"']*)["']/gi)) achados.add(m[1]!);
+  for (const m of html.matchAll(/["'`](\/(?:rus|api|public|public-rus|download|files?|documents?)[^"'`\s]{2,200})["'`]/gi)) achados.add(m[1]!);
+  for (const m of html.matchAll(/https?:\/\/[^"'`\s<>]+/g)) achados.add(m[0]);
+  return [...achados]
+    .map((u) => {
+      try {
+        return new URL(u.replace(/&amp;/g, "&"), base).toString();
+      } catch {
+        return null;
+      }
+    })
+    .filter((u): u is string => !!u && !/\.(css|png|svg|ico|woff2?|jpg|gif)(\?|$)/i.test(u))
+    .slice(0, 40);
 }
 
 /** Numa página HTML, o endereço do PDF (iframe/embed/object/ligação para .pdf ou para o Google Storage/Drive). */
@@ -229,21 +292,28 @@ function urlPdfNaPagina(html: string, base: string): string | null {
 }
 
 /** Experimenta o link de um documento, sem guardar nada (para ver o que o Cegid devolve). */
-export async function testarDocumento(mpinvId?: number): Promise<{ ok: boolean; mpinvId?: number; passos: string[]; resultado: string }> {
+export async function testarDocumento(mpinvId?: number): Promise<{ ok: boolean; mpinvId?: number; passos: string[]; enderecos: string[]; temPagina: boolean; resultado: string }> {
   const [doc] = mpinvId
     ? await prisma.$queryRaw<Array<{ mpinv_id: number; document_cw_url: string }>>`SELECT mpinv_id, document_cw_url FROM lp_cloudware_monthly_processing_invoices WHERE mpinv_id = ${mpinvId}`
     : await prisma.$queryRaw<Array<{ mpinv_id: number; document_cw_url: string }>>`
         SELECT mpinv_id, document_cw_url FROM lp_cloudware_monthly_processing_invoices
         WHERE document_cw_url IS NOT NULL AND document_cw_url <> '' ORDER BY year DESC, month DESC, mpinv_id DESC LIMIT 1`;
-  if (!doc?.document_cw_url) return { ok: false, passos: [], resultado: "Não encontrei nenhuma fatura com link." };
+  if (!doc?.document_cw_url) return { ok: false, passos: [], enderecos: [], temPagina: false, resultado: "Não encontrei nenhuma fatura com link." };
   const passos: string[] = [];
+  let pagina: { html: string; urlFinal: string } | null = null;
   try {
-    const { dados, tipo } = await obterDocumento(doc.document_cw_url, passos);
-    return { ok: true, mpinvId: doc.mpinv_id, passos, resultado: `Funciona: veio um ${tipo.includes("pdf") ? "PDF" : tipo} com ${Math.round(dados.length / 1024)} KB.` };
+    const { dados, tipo } = await obterDocumento(doc.document_cw_url, passos, (html, urlFinal) => (pagina ??= { html, urlFinal }));
+    return { ok: true, mpinvId: doc.mpinv_id, passos, enderecos: [], temPagina: false, resultado: `Funciona: veio um ${tipo.includes("pdf") ? "PDF" : tipo} com ${Math.round(dados.length / 1024)} KB.` };
   } catch (e) {
-    return { ok: false, mpinvId: doc.mpinv_id, passos, resultado: descreverErro(e) };
+    const p = pagina as { html: string; urlFinal: string } | null;
+    if (p) ultimaPaginaTeste.valor = p;
+    return { ok: false, mpinvId: doc.mpinv_id, passos, enderecos: p ? enderecosNaPagina(p.html, p.urlFinal) : [], temPagina: !!p, resultado: descreverErro(e) };
   }
 }
+
+/** A última página HTML recebida no teste (para a descarregar e mostrar a quem souber ler). */
+const gt = globalThis as unknown as { __paginaTesteCegid?: { valor: { html: string; urlFinal: string } | null } };
+export const ultimaPaginaTeste = (gt.__paginaTesteCegid ??= { valor: null });
 
 function urlConfirmacaoDrive(html: string): string | null {
   const form = html.match(/<form[^>]+id="download-form"[^>]+action="([^"]+)"[^>]*>([\s\S]*?)<\/form>/i);

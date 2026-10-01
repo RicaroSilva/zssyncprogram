@@ -12,6 +12,7 @@ const n = (x: number) => new Intl.NumberFormat("pt-PT").format(x);
 export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Progresso; podeIniciar: boolean; destino: string | null }) {
   const [p, setP] = useState(inicial);
   const [erro, setErro] = useState<string | null>(null);
+  const [idTeste, setIdTeste] = useState("");
   const [teste, setTeste] = useState<Awaited<ReturnType<typeof testarDocumentoAction>> | null>(null);
   const [pendente, iniciar] = useTransition();
   const { estado, contagem } = p;
@@ -50,7 +51,19 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
               </Button>
             ) : (
               <>
-                <Button variant="outline" disabled={pendente} onClick={() => acao(async () => setTeste(await testarDocumentoAction()))} title="Descarrega a fatura mais recente só para ver se o link funciona. Não guarda nada.">
+                <input
+                  value={idTeste}
+                  onChange={(e) => setIdTeste(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Nº interno (opcional)"
+                  aria-label="Nº interno da fatura a testar"
+                  className="h-11 w-44 rounded-lg border border-border bg-surface px-3 text-sm"
+                />
+                <Button
+                  variant="outline"
+                  disabled={pendente}
+                  onClick={() => acao(async () => setTeste(await testarDocumentoAction(idTeste ? Number(idTeste) : undefined)))}
+                  title="Descarrega uma fatura (a mais recente, ou a do nº interno indicado) só para ver se o link funciona. Não guarda nada."
+                >
                   Testar um documento
                 </Button>
                 {contagem.comErro > 0 && (
@@ -98,6 +111,15 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
             {teste.resultado}
             {teste.mpinvId ? <span className="font-normal text-muted-foreground"> (fatura nº interno {teste.mpinvId})</span> : null}
           </p>
+          {teste.temPagina && (
+            <p className="mt-2">
+              O link devolveu uma página web em vez do PDF.{" "}
+              <a href="/api/cegid/pagina-teste" className="font-semibold text-accent hover:underline">
+                Descarregar a página recebida
+              </a>{" "}
+              (para enviar a quem está a configurar).
+            </p>
+          )}
           {teste.passos.length > 0 && (
             <ol className="mt-2 list-decimal space-y-1 pl-5 font-mono text-xs text-muted-foreground">
               {teste.passos.map((p, i) => (
@@ -106,6 +128,18 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
                 </li>
               ))}
             </ol>
+          )}
+          {teste.enderecos.length > 0 && (
+            <details className="mt-3">
+              <summary className="cursor-pointer font-semibold">Endereços encontrados na página ({teste.enderecos.length})</summary>
+              <ul className="mt-2 space-y-1 font-mono text-xs text-muted-foreground">
+                {teste.enderecos.map((u) => (
+                  <li key={u} className="break-all">
+                    {u}
+                  </li>
+                ))}
+              </ul>
+            </details>
           )}
         </div>
       )}
