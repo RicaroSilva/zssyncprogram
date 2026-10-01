@@ -1,0 +1,215 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #fbf9f8;
+  --surface: #ffffff;
+  --surface-2: #f6f3f2;
+  --foreground: #1b1c1c;
+  --muted: #f0eded;
+  --muted-foreground: #414750;
+  --border: #e2e8f0;
+  --primary: #c9993f;
+  --primary-hover: #b7862e;
+  --primary-foreground: #1a1305;
+  --accent: #c9993f;
+  --accent-hover: #b7862e;
+  --accent-foreground: #1a1305;
+  --ring: #c9993f;
+  --destructive: #ba1a1a;
+  --success: #2f8f3e;
+
+  --radius-card: 1rem;
+}
+
+.dark {
+  --background: #070f1a;
+  --surface: #0e1f30;
+  --surface-2: #13283c;
+  --foreground: #e8eef4;
+  --muted: #16293a;
+  --muted-foreground: #9bb0c4;
+  --border: #20384e;
+  --primary: #c9a227;
+  --primary-hover: #e8c98a;
+  --primary-foreground: #1c1608;
+  --accent: #c9a227;
+  --accent-hover: #e8c98a;
+  --accent-foreground: #1c1608;
+  --ring: #c9a227;
+  --destructive: #ef5350;
+  --success: #5cc46a;
+}
+
+* {
+  border-color: var(--border);
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading), var(--font-sans), system-ui, sans-serif;
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.container-fluid {
+  margin-inline: auto;
+  width: 85%;
+}
+
+.bento-card {
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  padding: 1.5rem;
+  transition:
+    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.2s ease;
+}
+
+.bento-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px -10px rgba(15, 31, 46, 0.12);
+}
+
+/* Blends de opacidade sobre tokens de cor (as variáveis são hex simples,
+   por isso os modificadores de opacidade nativos do Tailwind, ex. bg-primary/10,
+   não se aplicam — usa-se color-mix diretamente). */
+.bg-primary-10 {
+  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+.bg-destructive-10 {
+  background-color: color-mix(in srgb, var(--destructive) 10%, transparent);
+}
+.border-destructive-40 {
+  border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
+}
+.border-foreground-20 {
+  border-color: color-mix(in srgb, var(--foreground) 20%, transparent);
+}
+.hover-bg-primary-10:hover {
+  background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+.hover-bg-foreground-5:hover {
+  background-color: color-mix(in srgb, var(--foreground) 5%, transparent);
+}
+
+/* ── Acessibilidade: preferências do utilizador (components/accessibility-panel.tsx) ── */
+
+/* Alto contraste: aumenta bordas, escurece texto e fundos secundários. */
+.a11y-high-contrast {
+  --foreground: #000000;
+  --muted-foreground: #1a1a1a;
+  --border: #767676;
+  --muted: #e8e8e8;
+  --surface-2: #f0f0f0;
+  --primary: #003f84;
+  --primary-hover: #002e61;
+  --ring: #003f84;
+}
+
+.dark.a11y-high-contrast,
+.dark .a11y-high-contrast {
+  --foreground: #ffffff;
+  --muted-foreground: #e0e0e0;
+  --border: #8c8c8c;
+  --muted: #1e1e1e;
+  --surface-2: #111111;
+  --primary: #5ba8e5;
+  --primary-hover: #7abfee;
+  --ring: #5ba8e5;
+}
+
+/* Espaçamento aumentado (WCAG 1.4.12 — Text Spacing). */
+.a11y-text-spacing body,
+.a11y-text-spacing p,
+.a11y-text-spacing li,
+.a11y-text-spacing h1,
+.a11y-text-spacing h2,
+.a11y-text-spacing h3,
+.a11y-text-spacing h4 {
+  line-height: 1.8 !important;
+  letter-spacing: 0.06em !important;
+  word-spacing: 0.16em !important;
+}
+
+/* Reduzir/pausar animações (equivalente manual ao prefers-reduced-motion). */
+.a11y-reduce-motion *,
+.a11y-reduce-motion *::before,
+.a11y-reduce-motion *::after {
+  animation-play-state: paused !important;
+  animation-duration: 0.001ms !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Sublinhar todas as ligações (WCAG 1.4.1 — não depender só da cor). */
+.a11y-underline-links a {
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
+}
+
+/* Escala de cinzentos. */
+.a11y-grayscale {
+  filter: grayscale(1);
+}
+
+/* Inverter cores (mantém imagens e vídeo com as cores originais). */
+.a11y-invert-colors {
+  filter: invert(1) hue-rotate(180deg);
+}
+.a11y-invert-colors img,
+.a11y-invert-colors picture,
+.a11y-invert-colors video,
+.a11y-invert-colors svg {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* Cursor maior (SVG inline, seta preta com contorno branco). */
+.a11y-big-cursor,
+.a11y-big-cursor * {
+  cursor:
+    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24"><path d="M4 2 L4 20 L9 15 L12 22 L15 21 L12 14 L19 14 Z" fill="black" stroke="white" stroke-width="1.5"/></svg>')
+      2 2,
+    auto !important;
+}
+
+/* Fonte de leitura facilitada (sem tracejados/serifas, maior espaçamento). */
+.a11y-dyslexia-font,
+.a11y-dyslexia-font * {
+  font-family: Verdana, Tahoma, Arial, sans-serif !important;
+  letter-spacing: 0.03em !important;
+}

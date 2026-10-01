@@ -1,0 +1,271 @@
+// Schema Prisma — Faturação Lusopay (Cyclos → ZSGO)
+//
+// IMPORTANTE: esta aplicação usa a MESMA base de dados do Cyclos (é lá que
+// estão os utilizadores, as transações e as tabelas de controlo zsgo_* que
+// o programa em Java já usa). Por isso:
+//
+//   - NUNCA correr `prisma migrate` nem `prisma db push` contra esta base
+//     de dados — o Prisma não conhece as centenas de tabelas do Cyclos e
+//     tentaria apagá-las. As tabelas criam-se com SQL idempotente
+//     (`sql/preparar.sql`, via `pnpm db:preparar`), tal como o programa em
+//     Java faz (CREATE TABLE IF NOT EXISTS / ADD COLUMN IF NOT EXISTS).
+//   - Este schema só declara as tabelas desta aplicação (zsgo_*). As
+//     tabelas do Cyclos (transfers, users, accounts, …) leem-se com SQL
+//     direto ($queryRaw), com as queries do config, como no Java.
+//
+// Organização: Identidade & acessos (zsgo_web_*) · Controlo da faturação
+// (zsgo_* partilhadas com o programa em Java).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Identidade & acessos — mesma metodologia do financial: administradores
+// só por Keycloak (OIDC), acesso de emergência por variáveis de ambiente,
+// RBAC por Perfil × recurso, sessões em base de dados e auditoria
+// encadeada por hash.
+// ─────────────────────────────────────────────────────────────────────────
+
+model Utilizador {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  nomeExibicao  String    @map("nome_exibicao")
+  /// ATIVO | SUSPENSO | BLOQUEADO
+  estado        String    @default("ATIVO")
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+  atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
+  ultimoLoginEm DateTime? @map("ultimo_login_em")
+
+  perfis              UtilizadorPerfil[]
+  identidadesExternas IdentidadeExterna[]
+  sessoes             Sessao[]
+  registosAuditoria   RegistoAuditoria[]
+
+  @@map("zsgo_web_utilizador")
+}
+
+model Perfil {
+  id                String   @id @default(uuid())
+  nome              String   @unique
+  descricao         String?
+  /// Perfis base (Super Admin) não são elimináveis.
+  criadoPeloSistema Boolean  @default(false) @map("criado_pelo_sistema")
+  /// Acesso total, sem passar pela matriz de PermissaoRecurso.
+  superAdmin        Boolean  @default(false) @map("super_admin")
+  criadoEm          DateTime @default(now()) @map("criado_em")
+
+  utilizadores      UtilizadorPerfil[]
+  permissoesRecurso PermissaoRecurso[]
+
+  @@map("zsgo_web_perfil")
+}
+
+/// Permissões por perfil × recurso (ver lib/recursos.ts para a lista de
+/// recursos). Ausência de linha == sem acesso a essa área.
+model PermissaoRecurso {
+  id        String  @id @default(uuid())
+  perfilId  String  @map("perfil_id")
+  recurso   String
+  consultar Boolean @default(false)
+  criar     Boolean @default(false)
+  editar    Boolean @default(false)
+  eliminar  Boolean @default(false)
+
+  perfil Perfil @relation(fields: [perfilId], references: [id], onDelete: Cascade)
+
+  @@unique([perfilId, recurso])
+  @@map("zsgo_web_permissao_recurso")
+}
+
+model UtilizadorPerfil {
+  utilizadorId String   @map("utilizador_id")
+  perfilId     String   @map("perfil_id")
+  atribuidoEm  DateTime @default(now()) @map("atribuido_em")
+
+  utilizador Utilizador @relation(fields: [utilizadorId], references: [id], onDelete: Cascade)
+  perfil     Perfil     @relation(fields: [perfilId], references: [id], onDelete: Cascade)
+
+  @@id([utilizadorId, perfilId])
+  @@map("zsgo_web_utilizador_perfil")
+}
+
+/// Ligação ao Keycloak ("sub"), criada no primeiro login.
+model IdentidadeExterna {
+  id             String   @id @default(uuid())
+  utilizadorId   String   @map("utilizador_id")
+  provedor       String
+  sujeitoExterno String   @map("sujeito_externo")
+  dadosBrutos    Json?    @map("dados_brutos")
+  criadoEm       DateTime @default(now()) @map("criado_em")
+
+  utilizador Utilizador @relation(fields: [utilizadorId], references: [id], onDelete: Cascade)
+
+  @@unique([provedor, sujeitoExterno])
+  @@index([utilizadorId])
+  @@map("zsgo_web_identidade_externa")
+}
+
+model Sessao {
+  id           String    @id @default(uuid())
+  utilizadorId String    @map("utilizador_id")
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  expiraEm     DateTime  @map("expira_em")
+  ip           String?
+  userAgent    String?   @map("user_agent")
+  revogadaEm   DateTime? @map("revogada_em")
+
+  utilizador Utilizador @relation(fields: [utilizadorId], references: [id], onDelete: Cascade)
+
+  @@index([utilizadorId])
+  @@map("zsgo_web_sessao")
+}
+
+model TentativaAutenticacao {
+  id          String   @id @default(uuid())
+  email       String
+  sucesso     Boolean
+  motivoFalha String?  @map("motivo_falha")
+  ip          String?
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  @@index([email, criadoEm])
+  @@map("zsgo_web_tentativa_autenticacao")
+}
+
+/// Auditoria imutável, encadeada por hash. Nunca UPDATE/DELETE.
+model RegistoAuditoria {
+  id           String   @id @default(uuid())
+  utilizadorId String?  @map("utilizador_id")
+  acao         String
+  entidade     String
+  entidadeId   String?  @map("entidade_id")
+  antes        Json?
+  depois       Json?
+  ip           String?
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  hashAnterior String?  @map("hash_anterior")
+  hashAtual    String   @map("hash_atual")
+
+  utilizador Utilizador? @relation(fields: [utilizadorId], references: [id], onDelete: SetNull)
+
+  @@index([entidade, entidadeId])
+  @@index([utilizadorId, criadoEm])
+  @@map("zsgo_web_auditoria")
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Controlo da faturação — tabelas JÁ EXISTENTES, partilhadas com o
+// programa em Java (zsgo-client-sync). Não mudar nomes nem tipos aqui sem
+// mudar também no Java; colunas novas só com ADD COLUMN IF NOT EXISTS em
+// sql/preparar.sql.
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Clientes do Cyclos já importados (ou a importar) no ZSGO.
+model ClienteSync {
+  userId       BigInt   @id @map("user_id")
+  zsgoCode     BigInt?  @map("zsgo_code")
+  zsgoDados    Json?    @map("zsgo_dados")
+  status       String   @default("PENDENTE") @db.VarChar(16)
+  tentativas   Int      @default(0)
+  ultimoErro   String?  @map("ultimo_erro")
+  contentHash  String?  @map("content_hash") @db.VarChar(64)
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm DateTime @default(now()) @map("atualizado_em") @db.Timestamp(6)
+
+  @@map("zsgo_client_sync")
+}
+
+/// Uma fatura mensal por cliente × conta de origem × mês.
+model FaturaSync {
+  userId              BigInt    @map("user_id")
+  origemId            BigInt    @map("origem_id")
+  ano                 Int
+  mes                 Int
+  zsgoSaleId          String?   @map("zsgo_sale_id") @db.VarChar(64)
+  pdfUrl              String?   @map("pdf_url")
+  valorTotal          Decimal?  @map("valor_total") @db.Decimal
+  status              String    @default("PENDENTE") @db.VarChar(20)
+  tentativas          Int       @default(0)
+  ultimoErro          String?   @map("ultimo_erro")
+  criadoEm            DateTime  @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm        DateTime  @default(now()) @map("atualizado_em") @db.Timestamp(6)
+  zsgoNumero          String?   @map("zsgo_numero") @db.VarChar(64)
+  zsgoTotal           Decimal?  @map("zsgo_total") @db.Decimal
+  zsgoLiquido         Decimal?  @map("zsgo_liquido") @db.Decimal
+  zsgoIva             Decimal?  @map("zsgo_iva") @db.Decimal
+  zsgoEstado          String?   @map("zsgo_estado") @db.VarChar(40)
+  zsgoAnulado         Boolean?  @map("zsgo_anulado")
+  zsgoConferidoEm     DateTime? @map("zsgo_conferido_em") @db.Timestamp(6)
+  zsgoErroConferencia String?   @map("zsgo_erro_conferencia")
+  zsgoIncerto         Boolean   @default(false) @map("zsgo_incerto")
+
+  @@id([userId, origemId, ano, mes])
+  @@map("zsgo_invoice_sync")
+}
+
+/// Linhas (rubricas) de cada fatura criada.
+model FaturaLinha {
+  id               Int      @id @default(autoincrement())
+  clienteId        BigInt   @map("cliente_id")
+  origemId         BigInt?  @map("origem_id")
+  ano              Int
+  mes              Int
+  rubrica          String?  @db.VarChar(200)
+  productReference String?  @map("product_reference") @db.VarChar(200)
+  nrTransacoes     BigInt?  @map("nr_transacoes")
+  valor            Decimal? @db.Decimal
+  descricao        String?
+  criadoEm         DateTime @default(now()) @map("criado_em") @db.Timestamp(6)
+
+  @@map("zsgo_invoice_line_detail")
+}
+
+/// Notas de crédito (estornos de meses anteriores).
+model NotaCreditoSync {
+  chargebackId        BigInt   @id @map("chargeback_id")
+  transacaoOriginalId BigInt?  @map("transacao_original_id")
+  clienteId           BigInt?  @map("cliente_id")
+  ano                 Int?
+  mes                 Int?
+  valorEstorno        Decimal? @map("valor_estorno") @db.Decimal
+  zsgoNcId            String?  @map("zsgo_nc_id") @db.VarChar(64)
+  status              String   @default("PENDENTE") @db.VarChar(20)
+  tentativas          Int      @default(0)
+  ultimoErro          String?  @map("ultimo_erro")
+  criadoEm            DateTime @default(now()) @map("criado_em") @db.Timestamp(6)
+  atualizadoEm        DateTime @default(now()) @map("atualizado_em") @db.Timestamp(6)
+
+  @@map("zsgo_credit_note_sync")
+}
+
+/// Histórico de ações (o que o painel em Java mostra em "Histórico").
+model Historico {
+  id         Int      @id @default(autoincrement())
+  utilizador String?  @db.VarChar(64)
+  acao       String   @db.VarChar(60)
+  detalhe    String?
+  criadoEm   DateTime @default(now()) @map("criado_em") @db.Timestamp(6)
+
+  @@map("zsgo_historico")
+}
+
+/// Tarefas agendadas (sincronizar/atualizar clientes, faturação mensal).
+model Tarefa {
+  codigo          String    @id @db.VarChar(40)
+  ativa           Boolean   @default(false)
+  hora            String    @default("07:00") @db.VarChar(5)
+  diaMes          Int?      @map("dia_mes")
+  ultimaExecucao  DateTime? @map("ultima_execucao") @db.Timestamp(6)
+  ultimoEstado    String?   @map("ultimo_estado") @db.VarChar(20)
+  ultimoResultado String?   @map("ultimo_resultado")
+  aCorrerDesde    DateTime? @map("a_correr_desde") @db.Timestamp(6)
+  atualizadoEm    DateTime  @default(now()) @map("atualizado_em") @db.Timestamp(6)
+
+  @@map("zsgo_tarefas")
+}

@@ -1,0 +1,54 @@
+name: faturacao
+
+# Não há serviço "db": a aplicação usa a base de dados do Cyclos que já
+# existe (DATABASE_URL no .env). Ver README, "Base de dados".
+
+x-app-image: &app-image
+  image: faturacao-web:${TAG:-latest}
+  build:
+    context: .
+    dockerfile: Dockerfile
+
+services:
+  # Cria as tabelas que faltam (CREATE TABLE IF NOT EXISTS) e sai. Nunca
+  # apaga nada e nunca usa "prisma migrate" (ver packages/db/prisma/schema.prisma).
+  migrate:
+    <<: *app-image
+    working_dir: /app
+    command: ["pnpm", "--filter", "@faturacao/db", "preparar"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?defina DATABASE_URL no .env}
+    restart: "no"
+
+  # Dados base (perfil "Super Admin" e o primeiro administrador).
+  # `docker compose --profile seed run --rm seed`
+  seed:
+    <<: *app-image
+    working_dir: /app
+    command: ["pnpm", "--filter", "@faturacao/db", "seed"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      PRIMEIRO_ADMIN_EMAIL: ${PRIMEIRO_ADMIN_EMAIL:-}
+      PRIMEIRO_ADMIN_NOME: ${PRIMEIRO_ADMIN_NOME:-}
+    profiles: ["seed"]
+    restart: "no"
+
+  web:
+    <<: *app-image
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      KEYCLOAK_ISSUER: ${KEYCLOAK_ISSUER}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET}
+      KEYCLOAK_REDIRECT_URI: ${KEYCLOAK_REDIRECT_URI}
+      ADMIN_LOCAL_LOGIN_ENABLED: ${ADMIN_LOCAL_LOGIN_ENABLED:-false}
+      ADMIN_LOCAL_LOGIN_USERNAME: ${ADMIN_LOCAL_LOGIN_USERNAME:-}
+      ADMIN_LOCAL_LOGIN_PASSWORD_HASH_B64: ${ADMIN_LOCAL_LOGIN_PASSWORD_HASH_B64:-}
+      ZSGO_BASE_URL: ${ZSGO_BASE_URL:-}
+      ZSGO_TOKEN: ${ZSGO_TOKEN:-}
+      CYCLOS_INVOICE_URL: ${CYCLOS_INVOICE_URL:-}
+      CYCLOS_USER: ${CYCLOS_USER:-}
+      CYCLOS_PASSWORD: ${CYCLOS_PASSWORD:-}
+    ports:
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:3002:3002"

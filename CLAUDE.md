@@ -56,6 +56,14 @@ reference, notes, tax_region}`; `items[]{tax{rate}, totals{total}}`;
 `totals{net,tax,total}`; `pdf_url` vem null na lista. `meta.page_count`.
 O `search` NÃO procura pelo número — para encontrar por nº percorre-se a lista.
 
+## Aplicação web (`web/`)
+
+Versão web em curso (Next.js 15 + TypeScript + Prisma, mesma stack, estilo e
+login Keycloak do `charib-dev/financial`). Usa a MESMA base de dados do
+Cyclos e as mesmas tabelas `zsgo_*`; tabelas novas só `zsgo_web_*`, criadas
+por `web/packages/db/sql/preparar.sql`. NUNCA `prisma migrate`/`db push`
+nessa BD. Fases em `web/PLANEAMENTO.md`.
+
 ## Por fazer / pedidos em espera
 
 ### Faturação ocasional (ainda por especificar pelo utilizador)
