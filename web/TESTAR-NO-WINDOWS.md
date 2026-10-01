@@ -93,6 +93,48 @@ Abrir http://localhost:3002 → **Entrar com utilizador e senha** (o email e a
 senha do passo 3). Para parar: `Ctrl+C` no PowerShell. Da próxima vez basta
 o passo 5.
 
+## Tudo pelo cmd (Linha de comandos)
+
+Os mesmos passos, só no cmd. Abrir o **cmd como Administrador** só para o
+passo 1; o resto pode ser num cmd normal.
+
+```bat
+:: 1. Node.js 22 LTS (ou instalar à mão de https://nodejs.org) e pnpm
+winget install OpenJS.NodeJS.22
+:: fechar e abrir o cmd, depois:
+corepack enable
+
+:: 2. Código do ramo (o Windows 10/11 já traz curl e tar)
+mkdir C:\faturacao
+cd /d C:\faturacao
+curl -L -o codigo.zip https://github.com/RicaroSilva/zssyncprogram/archive/refs/heads/claude/clever-davinci-bo41hu.zip
+tar -xf codigo.zip --strip-components=1
+cd web
+
+:: 3. Dependências
+pnpm install
+pnpm --filter @faturacao/db build
+
+:: 4. Configuração
+copy C:\caminho\do\config.properties config.properties
+pnpm --filter @faturacao/web hash-senha "A-MINHA-SENHA"
+notepad apps\web\.env.local
+::    (colar o conteúdo do passo 3 acima, guardar e fechar)
+
+:: 5. Base de dados (sem aspas à volta do valor)
+set DATABASE_URL=postgresql://UTILIZADOR:SENHA@IP-DO-POSTGRES:5432/NOME-DA-BD
+pnpm db:preparar
+pnpm db:seed
+
+:: 6. Arrancar e abrir http://localhost:3002
+pnpm --filter @faturacao/web dev
+```
+
+Se o repositório for privado, o `curl` não consegue descarregar: nesse caso
+descarregar o ZIP no browser (GitHub → ramo → **Code → Download ZIP**),
+descompactar em `C:\faturacao` e continuar a partir de `cd web`.
+No `set DATABASE_URL=…`, se a senha tiver `%`, escrever `%%`.
+
 ## Problemas comuns
 
 - **`pnpm` não é reconhecido** → fechar e abrir o PowerShell depois do
