@@ -133,7 +133,6 @@ pnpm --filter @faturacao/web dev
 Se o repositório for privado, o `curl` não consegue descarregar: nesse caso
 descarregar o ZIP no browser (GitHub → ramo → **Code → Download ZIP**),
 descompactar em `C:\faturacao` e continuar a partir de `cd web`.
-No `set DATABASE_URL=…`, se a senha tiver `%`, escrever `%%`.
 
 ## Problemas comuns
 
