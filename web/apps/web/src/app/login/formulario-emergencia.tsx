@@ -2,31 +2,38 @@
 
 import { useState } from "react";
 import { Button } from "@/components/button";
-import { loginEmergenciaAction } from "./actions";
+import { loginEmergenciaAction, loginPainelAction } from "./actions";
 import { usarTransicaoComEspera } from "@/lib/usar-transicao-com-espera";
 
-export function FormularioLoginEmergencia() {
+/** Formulário utilizador/senha — acesso de emergência (credenciais do .env)
+ *  ou conta do painel em Java (zsgo_app_users). */
+export function FormularioLoginEmergencia({ tipo = "emergencia" }: { tipo?: "emergencia" | "painel" }) {
   const [erro, setErro] = useState<string | null>(null);
   const [pendente, iniciarTransicao, avisoEspera] = usarTransicaoComEspera();
 
-  function submeter(formData: FormData) {
+  // onSubmit (e não <form action>): com "action" o React limpa os campos
+  // depois de cada tentativa, e um erro na senha obrigava a reescrever o
+  // utilizador.
+  function submeter(evento: React.FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    const formData = new FormData(evento.currentTarget);
     setErro(null);
     const username = String(formData.get("username") ?? "");
     const password = String(formData.get("password") ?? "");
     iniciarTransicao(async () => {
-      const resultado = await loginEmergenciaAction(username, password);
+      const resultado = await (tipo === "painel" ? loginPainelAction : loginEmergenciaAction)(username, password);
       if (!resultado.ok) setErro(resultado.erro ?? "Não foi possível autenticar.");
     });
   }
 
   return (
-    <form action={submeter} className="mt-6 space-y-3 text-left">
+    <form onSubmit={submeter} className="mt-6 space-y-3 text-left">
       <div>
-        <label htmlFor="username" className="mb-1.5 block text-sm font-medium text-foreground">
+        <label htmlFor={`username-${tipo}`} className="mb-1.5 block text-sm font-medium text-foreground">
           Utilizador
         </label>
         <input
-          id="username"
+          id={`username-${tipo}`}
           name="username"
           type="text"
           autoComplete="username"
@@ -35,11 +42,11 @@ export function FormularioLoginEmergencia() {
         />
       </div>
       <div>
-        <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-foreground">
+        <label htmlFor={`password-${tipo}`} className="mb-1.5 block text-sm font-medium text-foreground">
           Senha
         </label>
         <input
-          id="password"
+          id={`password-${tipo}`}
           name="password"
           type="password"
           autoComplete="current-password"
@@ -48,8 +55,8 @@ export function FormularioLoginEmergencia() {
         />
       </div>
       {erro && <p className="text-sm text-destructive">{erro}</p>}
-      <Button type="submit" variant="outline" size="lg" disabled={pendente} className="w-full">
-        Entrar com utilizador e senha
+      <Button type="submit" variant={tipo === "painel" ? "primary" : "outline"} size="lg" disabled={pendente} className="w-full">
+        {tipo === "painel" ? "Entrar com a conta do painel" : "Entrar com utilizador e senha"}
       </Button>
       {avisoEspera}
     </form>

@@ -24,7 +24,7 @@ export default async function PaginaTarefas() {
   const agora = agoraLocal();
   const s = sinal[0];
   const agendadorLigado = !!s && s.segundos !== null && s.segundos < 120;
-  const agendadorDesligadoAqui = process.env.AGENDADOR === "false";
+  const agendadorDesligadoAqui = process.env.AGENDADOR ? process.env.AGENDADOR !== "true" : process.env.NODE_ENV !== "production";
 
   return (
     <div>
@@ -38,11 +38,11 @@ export default async function PaginaTarefas() {
         {agendadorLigado ? (
           <>
             Agendador ligado ({s?.maquina}, último sinal há {s?.segundos} s).
-            {agendadorDesligadoAqui && " Nesta aplicação o agendador está desligado (AGENDADOR=false) — é o outro agendador que corre as tarefas."}
+            {agendadorDesligadoAqui && " Nesta aplicação o agendador está desligado (AGENDADOR) — é o outro agendador que corre as tarefas."}
           </>
         ) : (
           <span className="text-destructive">
-            O agendador não dá sinal há mais de 2 minutos{agendadorDesligadoAqui ? " (nesta aplicação está desligado com AGENDADOR=false)" : ""} — as
+            O agendador não dá sinal há mais de 2 minutos{agendadorDesligadoAqui ? " (nesta aplicação está desligado — AGENDADOR)" : ""} — as
             tarefas não estão a correr sozinhas.
           </span>
         )}

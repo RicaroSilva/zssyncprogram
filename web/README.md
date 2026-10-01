@@ -162,6 +162,13 @@ para o `.env`. Só entra quem existir como utilizador da aplicação com o
 mesmo email (o primeiro é criado pelo seed com `PRIMEIRO_ADMIN_EMAIL`); o
 primeiro login liga a conta Keycloak automaticamente.
 
+### Contas do painel em Java
+
+Em desenvolvimento (`pnpm dev`) a página de login aceita também as contas
+do painel em Java (`zsgo_app_users`): ADMIN → Super Admin, as outras →
+Consulta. Em produção está desligado; liga-se com `LOGIN_PAINEL=true`
+(útil durante a transição, enquanto o Keycloak não está configurado).
+
 ### Acesso de emergência
 
 Para entrar sem Keycloak (ex.: enquanto o client não está criado):
@@ -195,6 +202,11 @@ pnpm --filter @faturacao/db build
 pnpm --filter @faturacao/web dev     # http://localhost:3002
 ```
 
-Para experimentar no Windows antes de instalar num servidor: `TESTAR-NO-WINDOWS.md`.
+Para experimentar no Windows antes de instalar num servidor: `TESTAR-NO-WINDOWS.md`
+(basta copiar o `config.properties` para a pasta `web/` e correr
+`pnpm --filter @faturacao/web dev`; sem `DATABASE_URL`, a ligação vem do
+`db.url` do `config.properties`; as tabelas criam-se ao arrancar; em
+desenvolvimento entra-se com as contas do painel em Java e o agendador fica
+desligado).
 
 Ver `PLANEAMENTO.md` para as fases e o que já está feito.

@@ -21,7 +21,9 @@ const nextConfig: NextConfig = {
               "base-uri 'self'",
               "form-action 'self'",
               "object-src 'none'",
-              "script-src 'self' 'unsafe-inline'",
+              // 'unsafe-eval' só em desenvolvimento (pnpm dev): o Next precisa
+              // dele para recarregar o código; em produção nunca.
+              process.env.NODE_ENV === "development" ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'" : "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https:",
               "font-src 'self' data:",

@@ -1,4 +1,8 @@
 import { PrismaClient } from "@faturacao/db";
+import { garantirDatabaseUrl } from "./properties";
+
+// Sem DATABASE_URL, usa a base de dados do config.properties (como o Java).
+garantirDatabaseUrl();
 
 declare global {
   // eslint-disable-next-line no-var

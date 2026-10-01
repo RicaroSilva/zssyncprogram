@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { verificarCredenciaisEmergencia } from "@/lib/login-emergencia";
+import { verificarContaPainel } from "@/lib/login-painel";
 import { criarSessao } from "@/lib/auth";
 import { registarAuditoria } from "@/lib/auditoria";
 import { obterIpCliente } from "@/lib/rede-confianca";
@@ -27,5 +28,14 @@ export async function loginEmergenciaAction(username: string, password: string):
   }
   await criarSessao(resultado.utilizadorId);
   await registarAuditoria({ utilizadorId: resultado.utilizadorId, acao: "login_emergencia", entidade: "Utilizador", entidadeId: resultado.utilizadorId, ip });
+  redirect("/");
+}
+
+export async function loginPainelAction(username: string, password: string): Promise<ResultadoLoginEmergenciaAction> {
+  const ip = obterIpCliente(await headers());
+  const resultado = await verificarContaPainel(username, password, ip);
+  if (!resultado.ok || !resultado.utilizadorId) return { ok: false, erro: resultado.erro ?? "Não foi possível autenticar." };
+  await criarSessao(resultado.utilizadorId);
+  await registarAuditoria({ utilizadorId: resultado.utilizadorId, acao: "login_painel", entidade: "Utilizador", entidadeId: resultado.utilizadorId, ip });
   redirect("/");
 }

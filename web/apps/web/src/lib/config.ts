@@ -10,44 +10,11 @@ import { readFileSync, statSync } from "node:fs";
  * o ficheiro muda.
  */
 
+import { caminhoConfig, lerProperties } from "./properties";
+
+export { caminhoConfig, lerProperties };
+
 let cache: { caminho: string; mtimeMs: number; valores: Map<string, string> } | undefined;
-
-export function caminhoConfig(): string {
-  return process.env.CONFIG_PROPERTIES || "/config/config.properties";
-}
-
-/** Formato .properties do Java: chave=valor (ou chave: valor), linhas
- *  continuadas com "\" no fim, comentários # e !, escapes \uXXXX \n \t. */
-export function lerProperties(texto: string): Map<string, string> {
-  const valores = new Map<string, string>();
-  const linhas = texto.replace(/\r\n?/g, "\n").split("\n");
-  for (let i = 0; i < linhas.length; i++) {
-    let linha = linhas[i]!.replace(/^\s+/, "");
-    if (!linha || linha.startsWith("#") || linha.startsWith("!")) continue;
-    while (terminaEmContinuacao(linha) && i + 1 < linhas.length) {
-      linha = linha.slice(0, -1) + linhas[++i]!.replace(/^\s+/, "");
-    }
-    const m = linha.match(/^((?:\\.|[^=:\s])+)\s*[=:\s]\s*(.*)$/);
-    if (!m) {
-      valores.set(desescapar(linha), "");
-      continue;
-    }
-    valores.set(desescapar(m[1]!), desescapar(m[2]!));
-  }
-  return valores;
-}
-
-function terminaEmContinuacao(linha: string): boolean {
-  const barras = linha.match(/\\+$/)?.[0].length ?? 0;
-  return barras % 2 === 1;
-}
-
-function desescapar(s: string): string {
-  return s.replace(/\\(u[0-9a-fA-F]{4}|.)/g, (_, c: string) => {
-    if (c.startsWith("u") && c.length === 5) return String.fromCharCode(parseInt(c.slice(1), 16));
-    return c === "n" ? "\n" : c === "t" ? "\t" : c === "r" ? "\r" : c === "f" ? "\f" : c;
-  });
-}
 
 function valores(): Map<string, string> {
   const caminho = caminhoConfig();
