@@ -13,6 +13,7 @@ const AJUDA: Record<string, string> = {
   RESUMO: "Página inicial com os números do mês.",
   FATURACAO: "Consultar faturas e notas de crédito; criar = gerar a faturação; editar = conferir, associar faturas, diagnóstico.",
   CLIENTES: "Lista de clientes do Cyclos e o estado no ZSGO.",
+  ZSGO: "Tudo o que a API do ZSGO permite: consultar; criar = clientes, documentos, recibos…; editar; eliminar = eliminar e anular documentos.",
   TAREFAS: "Ver as tarefas agendadas; editar = ligar/desligar, mudar a hora, executar agora.",
   HISTORICO: "Quem fez o quê.",
   UTILIZADORES: "Dar e tirar acesso à aplicação.",

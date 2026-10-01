@@ -1,0 +1,6323 @@
+{
+ "versao": "1.3",
+ "servidor": "https://sandbox.zsgo.pt/api/v1/ext",
+ "operacoes": [
+  {
+   "metodo": "GET",
+   "caminho": "/clients",
+   "resumo": "List clients",
+   "descricao": "Returns paginated customer records visible to the authenticated API key.",
+   "etiqueta": "Clients",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    {
+     "nome": "inactive",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "boolean",
+       "null"
+      ]
+     }
+    },
+    {
+     "nome": "in_litigation",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "enum": [
+       "0",
+       "1",
+       "2",
+       null
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/clients",
+   "resumo": "Create a client",
+   "descricao": "Creates a customer using the public nested client payload.",
+   "etiqueta": "Clients",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "identity",
+     "address",
+     "billing",
+     "settings"
+    ],
+    "properties": {
+     "identity": {
+      "type": "object",
+      "description": "Customer identity data.",
+      "required": [
+       "name"
+      ],
+      "properties": {
+       "code": {
+        "type": [
+         "integer",
+         "null"
+        ],
+        "description": "Customer code. When omitted on create, the system may assign the next available code."
+       },
+       "name": {
+        "type": "string",
+        "description": "Customer legal or commercial name."
+       },
+       "tax_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer tax identification number."
+       },
+       "tax_subject": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the customer is a VAT taxable person (sujeito passivo)."
+       }
+      }
+     },
+     "address": {
+      "type": "object",
+      "description": "Customer billing address.",
+      "required": [
+       "country_code"
+      ],
+      "properties": {
+       "country_code": {
+        "type": "string",
+        "description": "ISO 3166-1 alpha-2 country code."
+       },
+       "address": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Street address."
+       },
+       "postal_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Postal code."
+       },
+       "city": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "City or locality."
+       },
+       "region_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Fiscal region code for the customer's country (e.g. CON, AC, MA for Portugal)."
+       }
+      }
+     },
+     "billing": {
+      "type": "object",
+      "description": "Customer billing defaults.",
+      "required": [
+       "price_line"
+      ],
+      "properties": {
+       "payment_option_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default payment option identifier."
+       },
+       "payment_method_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default payment method identifier."
+       },
+       "exemption_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Tax exemption code applied by default."
+       },
+       "salesman_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default salesman code."
+       },
+       "price_line": {
+        "type": "integer",
+        "description": "Default price line identifier."
+       },
+       "global_discount": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Global discount percentage applied by default."
+       },
+       "retention": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether withholding retention applies by default."
+       },
+       "retention_rate": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Withholding retention rate."
+       },
+       "exemption_detail": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Free-text detail to justify the tax exemption code."
+       }
+      }
+     },
+     "settings": {
+      "type": "object",
+      "description": "Customer contact details, account flags and document delivery mode.",
+      "properties": {
+       "phone": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer phone number."
+       },
+       "mobile": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer mobile phone number."
+       },
+       "email": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer email address."
+       },
+       "website": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer website URL."
+       },
+       "fax": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer fax number."
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Internal notes about the customer."
+       },
+       "inactive": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the customer is inactive."
+       },
+       "in_litigation": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the customer is marked as in litigation."
+       },
+       "blocked": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the customer is blocked for new operations."
+       },
+       "print_type": {
+        "type": [
+         "integer",
+         "null"
+        ],
+        "description": "Document delivery / electronic invoicing mode (default 1): 1 = PDF only; 2 = PDF + CIUS-PT XML,\ndownloadable through the sale `xml_url`; 3 = CIUS-PT webservice, the XML is sent to Saphety when\nthe document is finalized. 2 is available to Portuguese companies, 3 only when Saphety CIUS-PT\nelectronic invoicing is active for the company (422 otherwise). Customers with print_type 2 or 3\nmust have a full billing address (address, postal_code, city) before documents can be issued."
+       },
+       "commitment_number": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default B2G commitment number (LCPA) copied onto new sales documents when the sale\npayload omits `document.commitment_number`. Emitted as CIUS-PT BT-19 (cbc:AccountingCost).\nOptional, max 50 characters, only meaningful for print_type 2 or 3."
+       },
+       "requesting_service": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default B2G requesting service of the public customer, copied onto new sales documents\nwhen the sale payload omits `document.requesting_service`. Emitted as CIUS-PT BT-10\n(cbc:BuyerReference). Optional, max 50 characters, only meaningful for print_type 2 or 3."
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "409",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/clients/{code}",
+   "resumo": "Get a client",
+   "descricao": "Returns one customer by public client code.",
+   "etiqueta": "Clients",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Client public code.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/clients/{code}",
+   "resumo": "Update a client",
+   "descricao": "Partially updates a customer by public client code.",
+   "etiqueta": "Clients",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Client public code.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "identity",
+     "address",
+     "billing",
+     "settings"
+    ],
+    "properties": {
+     "identity": {
+      "type": "object",
+      "description": "Customer identity data.",
+      "required": [
+       "name"
+      ],
+      "properties": {
+       "code": {
+        "type": [
+         "integer",
+         "null"
+        ],
+        "description": "Customer code. When omitted on create, the system may assign the next available code."
+       },
+       "name": {
+        "type": "string",
+        "description": "Customer legal or commercial name."
+       },
+       "tax_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer tax identification number."
+       },
+       "tax_subject": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the customer is a VAT taxable person (sujeito passivo)."
+       }
+      }
+     },
+     "address": {
+      "type": "object",
+      "description": "Customer billing address.",
+      "required": [
+       "country_code"
+      ],
+      "properties": {
+       "country_code": {
+        "type": "string",
+        "description": "ISO 3166-1 alpha-2 country code."
+       },
+       "address": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Street address."
+       },
+       "postal_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Postal code."
+       },
+       "city": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "City or locality."
+       },
+       "region_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Fiscal region code for the customer's country (e.g. CON, AC, MA for Portugal)."
+       }
+      }
+     },
+     "billing": {
+      "type": "object",
+      "description": "Customer billing defaults.",
+      "required": [
+       "price_line"
+      ],
+      "properties": {
+       "payment_option_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default payment option identifier."
+       },
+       "payment_method_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default payment method identifier."
+       },
+       "exemption_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Tax exemption code applied by default."
+       },
+       "salesman_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default salesman code."
+       },
+       "price_line": {
+        "type": "integer",
+        "description": "Default price line identifier."
+       },
+       "global_discount": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Global discount percentage applied by default."
+       },
+       "retention": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether withholding retention applies by default."
+       },
+       "retention_rate": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Withholding retention rate."
+       },
+       "exemption_detail": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Free-text detail to justify the tax exemption code."
+       }
+      }
+     },
+     "settings": {
+      "type": "object",
+      "description": "Customer contact details, account flags and document delivery mode.",
+      "properties": {
+       "phone": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer phone number."
+       },
+       "mobile": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer mobile phone number."
+       },
+       "email": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer email address."
+       },
+       "website": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer website URL."
+       },
+       "fax": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Customer fax number."
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Internal notes about the customer."
+       },
+       "inactive": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the customer is inactive."
+       },
+       "in_litigation": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the customer is marked as in litigation."
+       },
+       "blocked": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the customer is blocked for new operations."
+       },
+       "print_type": {
+        "type": [
+         "integer",
+         "null"
+        ],
+        "description": "Document delivery / electronic invoicing mode (default 1): 1 = PDF only; 2 = PDF + CIUS-PT XML,\ndownloadable through the sale `xml_url`; 3 = CIUS-PT webservice, the XML is sent to Saphety when\nthe document is finalized. 2 is available to Portuguese companies, 3 only when Saphety CIUS-PT\nelectronic invoicing is active for the company (422 otherwise). Customers with print_type 2 or 3\nmust have a full billing address (address, postal_code, city) before documents can be issued."
+       },
+       "commitment_number": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default B2G commitment number (LCPA) copied onto new sales documents when the sale\npayload omits `document.commitment_number`. Emitted as CIUS-PT BT-19 (cbc:AccountingCost).\nOptional, max 50 characters, only meaningful for print_type 2 or 3."
+       },
+       "requesting_service": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default B2G requesting service of the public customer, copied onto new sales documents\nwhen the sale payload omits `document.requesting_service`. Emitted as CIUS-PT BT-10\n(cbc:BuyerReference). Optional, max 50 characters, only meaningful for print_type 2 or 3."
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "DELETE",
+   "caminho": "/clients/{code}",
+   "resumo": "Delete a client",
+   "descricao": "Soft-deletes a customer when no documents are associated.",
+   "etiqueta": "Clients",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Client public code.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/commissions",
+   "resumo": "Lista as comissões da estrutura tenant (inv_document_commissions)",
+   "descricao": "Filtros: document_id (transactionsale_id), date_from/date_to (document_date),\ndocument_status (int|array). Modo: ?group=document devolve o total por documento.",
+   "etiqueta": "Commissions",
+   "parametros": [
+    {
+     "nome": "date_from",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "date_to",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "document_id",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "group",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "document_status",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/countries",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Countries",
+   "parametros": [],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/document-types",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "DocumentTypes",
+   "parametros": [
+    {
+     "nome": "movementType",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "Filter by category. Possible values: vendas, recibos, compras, stocks, avisos.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/exemptions",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Exemptions",
+   "parametros": [],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/families",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Families",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/families",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Families",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "description"
+    ],
+    "properties": {
+     "description": {
+      "type": "string",
+      "description": "Product family description."
+     },
+     "parent_id": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "description": "Parent product family ID for hierarchical families."
+     },
+     "active": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Whether the product family is active."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/families/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Families",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/families/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Families",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "description"
+    ],
+    "properties": {
+     "description": {
+      "type": "string",
+      "description": "Product family description."
+     },
+     "parent_id": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "description": "Parent product family ID for hierarchical families."
+     },
+     "active": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Whether the product family is active."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "DELETE",
+   "caminho": "/families/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Families",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/payment-methods",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PaymentMethods",
+   "parametros": [],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/payment-methods",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PaymentMethods",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "description",
+     "payment_type_id"
+    ],
+    "properties": {
+     "description": {
+      "type": "string",
+      "description": "Payment method description."
+     },
+     "payment_type_id": {
+      "type": "string",
+      "description": "Payment type id (inv_paymenttypes)."
+     },
+     "only_sale": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Only available for sales."
+     },
+     "only_financial": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Only available for treasury/financial operations."
+     },
+     "has_comission": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Tracks commission."
+     },
+     "ignore_customer": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Skip the customer selection screen."
+     },
+     "active": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Whether the payment method is active."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/payment-methods/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PaymentMethods",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/payment-methods/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PaymentMethods",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "description",
+     "payment_type_id"
+    ],
+    "properties": {
+     "description": {
+      "type": "string",
+      "description": "Payment method description."
+     },
+     "payment_type_id": {
+      "type": "string",
+      "description": "Payment type id (inv_paymenttypes)."
+     },
+     "only_sale": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Only available for sales."
+     },
+     "only_financial": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Only available for treasury/financial operations."
+     },
+     "has_comission": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Tracks commission."
+     },
+     "ignore_customer": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Skip the customer selection screen."
+     },
+     "active": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Whether the payment method is active."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "DELETE",
+   "caminho": "/payment-methods/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PaymentMethods",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/payment-options",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PaymentOptions",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/payment-options",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PaymentOptions",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "name",
+     "days",
+     "available_for"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Payment option name."
+     },
+     "days": {
+      "type": "integer",
+      "description": "Number of days until payment is due."
+     },
+     "available_for": {
+      "type": "string",
+      "description": "Entity type where this payment option is available."
+     },
+     "active": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Whether the payment option is active."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "409",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/payment-options/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PaymentOptions",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/payment-options/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PaymentOptions",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "name",
+     "days",
+     "available_for"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "description": "Payment option name."
+     },
+     "days": {
+      "type": "integer",
+      "description": "Number of days until payment is due."
+     },
+     "available_for": {
+      "type": "string",
+      "description": "Entity type where this payment option is available."
+     },
+     "active": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Whether the payment option is active."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "409",
+    "422"
+   ]
+  },
+  {
+   "metodo": "DELETE",
+   "caminho": "/payment-options/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PaymentOptions",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/price-lines",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PriceLines",
+   "parametros": [],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/products",
+   "resumo": "List products",
+   "descricao": "Returns paginated product and service catalog records.",
+   "etiqueta": "Products",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/products",
+   "resumo": "Create a product",
+   "descricao": "Creates a product or service using the public nested product payload.",
+   "etiqueta": "Products",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "identity",
+     "classification",
+     "pricing",
+     "tax"
+    ],
+    "properties": {
+     "identity": {
+      "type": "object",
+      "description": "Product identity data.",
+      "required": [
+       "reference",
+       "description"
+      ],
+      "properties": {
+       "reference": {
+        "type": "string",
+        "description": "Product reference used as the public identifier.",
+        "maxLength": 100
+       },
+       "description": {
+        "type": "string",
+        "description": "Product description shown in documents.",
+        "maxLength": 500
+       }
+      }
+     },
+     "classification": {
+      "type": [
+       "object",
+       "null"
+      ],
+      "description": "Product classification and catalog metadata.",
+      "required": [
+       "family_id",
+       "item_type_code"
+      ],
+      "properties": {
+       "family_id": {
+        "type": "integer",
+        "description": "Product family identifier."
+       },
+       "unit_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Unit code used for quantities.",
+        "maxLength": 20
+       },
+       "supplier_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default supplier code.",
+        "maxLength": 50
+       },
+       "item_type_code": {
+        "type": "string",
+        "enum": [
+         "P",
+         "S",
+         "O"
+        ],
+        "description": "Item type code: P (product), S (service), O (other e.g. shipping)."
+       },
+       "saft_item_type_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "P",
+         "S",
+         "O",
+         "E",
+         "I",
+         null
+        ],
+        "description": "SAF-T item type code: P (product), S (service), O (other), E (excise taxes), I (other taxes/fees)."
+       },
+       "inventory_item_type_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "M",
+         "A",
+         "P",
+         "S",
+         "T",
+         "B",
+         null
+        ],
+        "description": "Inventory item type code: M (merchandise), A (finished/intermediate products), P (raw materials), S (by-products/waste), T (work in progress), B (biological assets)."
+       },
+       "stock_control": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the product controls stock movements. Only applicable when item_type_code is P."
+       }
+      }
+     },
+     "pricing": {
+      "type": "object",
+      "description": "Product purchase and sale prices.",
+      "required": [
+       "purchase_price",
+       "sale_prices"
+      ],
+      "properties": {
+       "purchase_price": {
+        "type": "object",
+        "description": "Default purchase price data.",
+        "required": [
+         "unit_price_net"
+        ],
+        "properties": {
+         "unit_price_net": {
+          "type": "number",
+          "description": "Net purchase unit price without tax.",
+          "minimum": 0
+         },
+         "unit_price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Gross purchase unit price with tax.",
+          "minimum": 0
+         },
+         "fixed_rate": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Fixed purchase tax rate."
+         }
+        }
+       },
+       "sale_prices": {
+        "type": "array",
+        "description": "Sale prices by price line.",
+        "items": {
+         "type": "object",
+         "properties": {
+          "price_line": {
+           "type": "integer",
+           "description": "Price line identifier.",
+           "minimum": 1
+          },
+          "unit_price_net": {
+           "type": "number",
+           "description": "Net sale unit price without tax.",
+           "minimum": 0
+          },
+          "unit_price": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "description": "Gross sale unit price with tax.",
+           "minimum": 0
+          },
+          "fixed_rate": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "description": "Fixed sale tax rate."
+          }
+         }
+        }
+       }
+      }
+     },
+     "tax": {
+      "type": "object",
+      "description": "Product default tax configuration.",
+      "required": [
+       "sale_tax",
+       "purchase_tax"
+      ],
+      "properties": {
+       "sale_tax": {
+        "type": "number",
+        "description": "Default sale tax rate.",
+        "minimum": 0
+       },
+       "purchase_tax": {
+        "type": "number",
+        "description": "Default purchase tax rate.",
+        "minimum": 0
+       },
+       "exemption_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Tax exemption code when tax rate is zero.",
+        "maxLength": 20
+       }
+      }
+     },
+     "settings": {
+      "type": "object",
+      "description": "Product settings and flags.",
+      "properties": {
+       "discontinued": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the product is discontinued."
+       }
+      }
+     },
+     "taxes": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Optional taxes payload."
+     },
+     "prices": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Optional prices payload."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/products/{reference}",
+   "resumo": "Get a product",
+   "descricao": "Returns one product or service by public reference.",
+   "etiqueta": "Products",
+   "parametros": [
+    {
+     "nome": "reference",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Product public reference.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/products/{reference}",
+   "resumo": "Update a product",
+   "descricao": "Partially updates a product or service by public reference.",
+   "etiqueta": "Products",
+   "parametros": [
+    {
+     "nome": "reference",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Product public reference.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "identity",
+     "classification",
+     "pricing",
+     "tax"
+    ],
+    "properties": {
+     "identity": {
+      "type": "object",
+      "description": "Product identity data.",
+      "required": [
+       "reference",
+       "description"
+      ],
+      "properties": {
+       "reference": {
+        "type": "string",
+        "description": "Product reference used as the public identifier.",
+        "maxLength": 100
+       },
+       "description": {
+        "type": "string",
+        "description": "Product description shown in documents.",
+        "maxLength": 500
+       }
+      }
+     },
+     "classification": {
+      "type": [
+       "object",
+       "null"
+      ],
+      "description": "Product classification and catalog metadata.",
+      "required": [
+       "family_id",
+       "item_type_code"
+      ],
+      "properties": {
+       "family_id": {
+        "type": "integer",
+        "description": "Product family identifier."
+       },
+       "unit_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Unit code used for quantities.",
+        "maxLength": 20
+       },
+       "supplier_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Default supplier code.",
+        "maxLength": 50
+       },
+       "item_type_code": {
+        "type": "string",
+        "enum": [
+         "P",
+         "S",
+         "O"
+        ],
+        "description": "Item type code: P (product), S (service), O (other e.g. shipping)."
+       },
+       "saft_item_type_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "P",
+         "S",
+         "O",
+         "E",
+         "I",
+         null
+        ],
+        "description": "SAF-T item type code: P (product), S (service), O (other), E (excise taxes), I (other taxes/fees)."
+       },
+       "inventory_item_type_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "M",
+         "A",
+         "P",
+         "S",
+         "T",
+         "B",
+         null
+        ],
+        "description": "Inventory item type code: M (merchandise), A (finished/intermediate products), P (raw materials), S (by-products/waste), T (work in progress), B (biological assets)."
+       },
+       "stock_control": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the product controls stock movements. Only applicable when item_type_code is P."
+       }
+      }
+     },
+     "pricing": {
+      "type": "object",
+      "description": "Product purchase and sale prices.",
+      "required": [
+       "purchase_price",
+       "sale_prices"
+      ],
+      "properties": {
+       "purchase_price": {
+        "type": "object",
+        "description": "Default purchase price data.",
+        "required": [
+         "unit_price_net"
+        ],
+        "properties": {
+         "unit_price_net": {
+          "type": "number",
+          "description": "Net purchase unit price without tax.",
+          "minimum": 0
+         },
+         "unit_price": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Gross purchase unit price with tax.",
+          "minimum": 0
+         },
+         "fixed_rate": {
+          "type": [
+           "number",
+           "null"
+          ],
+          "description": "Fixed purchase tax rate."
+         }
+        }
+       },
+       "sale_prices": {
+        "type": "array",
+        "description": "Sale prices by price line.",
+        "items": {
+         "type": "object",
+         "properties": {
+          "price_line": {
+           "type": "integer",
+           "description": "Price line identifier.",
+           "minimum": 1
+          },
+          "unit_price_net": {
+           "type": "number",
+           "description": "Net sale unit price without tax.",
+           "minimum": 0
+          },
+          "unit_price": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "description": "Gross sale unit price with tax.",
+           "minimum": 0
+          },
+          "fixed_rate": {
+           "type": [
+            "number",
+            "null"
+           ],
+           "description": "Fixed sale tax rate."
+          }
+         }
+        }
+       }
+      }
+     },
+     "tax": {
+      "type": "object",
+      "description": "Product default tax configuration.",
+      "required": [
+       "sale_tax",
+       "purchase_tax"
+      ],
+      "properties": {
+       "sale_tax": {
+        "type": "number",
+        "description": "Default sale tax rate.",
+        "minimum": 0
+       },
+       "purchase_tax": {
+        "type": "number",
+        "description": "Default purchase tax rate.",
+        "minimum": 0
+       },
+       "exemption_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Tax exemption code when tax rate is zero.",
+        "maxLength": 20
+       }
+      }
+     },
+     "settings": {
+      "type": "object",
+      "description": "Product settings and flags.",
+      "properties": {
+       "discontinued": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the product is discontinued."
+       }
+      }
+     },
+     "taxes": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Optional taxes payload."
+     },
+     "prices": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Optional prices payload."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "DELETE",
+   "caminho": "/products/{reference}",
+   "resumo": "Delete a product",
+   "descricao": "Hides a product or service when no documents are associated.",
+   "etiqueta": "Products",
+   "parametros": [
+    {
+     "nome": "reference",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Product public reference.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/purchases",
+   "resumo": "List purchase documents",
+   "descricao": "Returns paginated purchase documents for the API key dedicated series.",
+   "etiqueta": "Purchases",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    {
+     "nome": "status",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/purchases",
+   "resumo": "Create a purchase document",
+   "descricao": "Creates and finalizes a purchase document in the API key dedicated series.",
+   "etiqueta": "Purchases",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "supplier",
+     "document",
+     "items"
+    ],
+    "properties": {
+     "pdf": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+     },
+     "supplier": {
+      "type": "object",
+      "description": "Supplier associated with the purchase document.",
+      "required": [
+       "code"
+      ],
+      "properties": {
+       "code": {
+        "type": "string",
+        "description": "Supplier code."
+       }
+      }
+     },
+     "document": {
+      "type": "object",
+      "description": "Purchase document metadata.",
+      "required": [
+       "type"
+      ],
+      "properties": {
+       "type": {
+        "type": "string",
+        "description": "Purchase document type acronym. Allowed types: CFA, CFS, CFR."
+       },
+       "transaction_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date",
+        "description": "Supplier transaction date in YYYY-MM-DD format."
+       },
+       "system_entry_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date-time",
+        "description": "System entry date."
+       },
+       "auto_confirm": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the document should be finalized automatically."
+       },
+       "payment_option_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Payment option identifier."
+       },
+       "payment_method_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Payment method identifier."
+       },
+       "warehouse_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Warehouse identifier used for stock movements."
+       },
+       "reference": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Supplier document reference."
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Document notes. Use \\n to separate lines."
+       },
+       "currency": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "ISO 4217 currency code.",
+        "maxLength": 3
+       },
+       "pdf": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+       },
+       "discount1": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Header discount percentage 1.",
+        "minimum": 0
+       },
+       "discount2": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Header discount percentage 2.",
+        "minimum": 0
+       },
+       "discount3": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Header discount percentage 3.",
+        "minimum": 0
+       }
+      }
+     },
+     "items": {
+      "type": "array",
+      "description": "Purchase document lines.",
+      "items": {
+       "type": "object",
+       "required": [
+        "product_reference",
+        "quantity",
+        "unit_price_net",
+        "taxes"
+       ],
+       "properties": {
+        "product_reference": {
+         "type": "string",
+         "description": "Product reference purchased in this line."
+        },
+        "quantity": {
+         "type": "number",
+         "description": "Quantity purchased."
+        },
+        "unit_price_net": {
+         "type": "number",
+         "description": "Net unit price without tax.",
+         "minimum": 0
+        },
+        "taxes": {
+         "type": "array",
+         "description": "Tax rows applied to this line.",
+         "items": {
+          "type": "object",
+          "required": [
+           "tax_rate"
+          ],
+          "properties": {
+           "tax_rate": {
+            "type": "number",
+            "description": "Tax rate percentage.",
+            "minimum": 0
+           },
+           "exemption_code": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Tax exemption code when tax rate is zero.",
+            "maxLength": 20
+           },
+           "exemption_reason": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Tax exemption legal reason."
+           }
+          }
+         }
+        },
+        "discount1": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Line discount percentage 1.",
+         "minimum": 0
+        },
+        "discount2": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Line discount percentage 2.",
+         "minimum": 0
+        },
+        "discount3": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Line discount percentage 3.",
+         "minimum": 0
+        },
+        "notes": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Line notes. Use \\n to separate lines."
+        }
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/purchases/{id}",
+   "resumo": "Get a purchase document",
+   "descricao": "Returns one purchase document with public payload and PDF URL when available.",
+   "etiqueta": "Purchases",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Purchase document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "pdf",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "Deprecated and ignored: the response always includes pdf_url, an authenticated link that renders the PDF on demand.",
+     "esquema": {
+      "type": "boolean",
+      "default": true
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/purchases/{id}",
+   "resumo": "Update a purchase document",
+   "descricao": "Updates a purchase document by ID when it belongs to the API key dedicated series.",
+   "etiqueta": "Purchases",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Purchase document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "supplier",
+     "document",
+     "items"
+    ],
+    "properties": {
+     "pdf": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+     },
+     "supplier": {
+      "type": "object",
+      "description": "Supplier associated with the purchase document.",
+      "required": [
+       "code"
+      ],
+      "properties": {
+       "code": {
+        "type": "string",
+        "description": "Supplier code."
+       }
+      }
+     },
+     "document": {
+      "type": "object",
+      "description": "Purchase document metadata.",
+      "required": [
+       "type"
+      ],
+      "properties": {
+       "type": {
+        "type": "string",
+        "description": "Purchase document type acronym. Allowed types: CFA, CFS, CFR."
+       },
+       "transaction_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date",
+        "description": "Supplier transaction date in YYYY-MM-DD format."
+       },
+       "system_entry_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date-time",
+        "description": "System entry date."
+       },
+       "auto_confirm": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the document should be finalized automatically."
+       },
+       "payment_option_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Payment option identifier."
+       },
+       "payment_method_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Payment method identifier."
+       },
+       "warehouse_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Warehouse identifier used for stock movements."
+       },
+       "reference": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Supplier document reference."
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Document notes. Use \\n to separate lines."
+       },
+       "currency": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "ISO 4217 currency code.",
+        "maxLength": 3
+       },
+       "pdf": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+       },
+       "discount1": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Header discount percentage 1.",
+        "minimum": 0
+       },
+       "discount2": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Header discount percentage 2.",
+        "minimum": 0
+       },
+       "discount3": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Header discount percentage 3.",
+        "minimum": 0
+       }
+      }
+     },
+     "items": {
+      "type": "array",
+      "description": "Purchase document lines.",
+      "items": {
+       "type": "object",
+       "required": [
+        "product_reference",
+        "quantity",
+        "unit_price_net",
+        "taxes"
+       ],
+       "properties": {
+        "product_reference": {
+         "type": "string",
+         "description": "Product reference purchased in this line."
+        },
+        "quantity": {
+         "type": "number",
+         "description": "Quantity purchased."
+        },
+        "unit_price_net": {
+         "type": "number",
+         "description": "Net unit price without tax.",
+         "minimum": 0
+        },
+        "taxes": {
+         "type": "array",
+         "description": "Tax rows applied to this line.",
+         "items": {
+          "type": "object",
+          "required": [
+           "tax_rate"
+          ],
+          "properties": {
+           "tax_rate": {
+            "type": "number",
+            "description": "Tax rate percentage.",
+            "minimum": 0
+           },
+           "exemption_code": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Tax exemption code when tax rate is zero.",
+            "maxLength": 20
+           },
+           "exemption_reason": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Tax exemption legal reason."
+           }
+          }
+         }
+        },
+        "discount1": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Line discount percentage 1.",
+         "minimum": 0
+        },
+        "discount2": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Line discount percentage 2.",
+         "minimum": 0
+        },
+        "discount3": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Line discount percentage 3.",
+         "minimum": 0
+        },
+        "notes": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Line notes. Use \\n to separate lines."
+        }
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/purchases/{id}/pdf",
+   "resumo": "Download the PDF of a purchase document",
+   "descricao": "Renders on first request, cached afterwards (a new render follows an annulment). Use the\n`pdf_url` returned by the other purchase endpoints. Only finalized documents have a PDF.",
+   "etiqueta": "Purchases",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "409",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/purchases/{id}/annul",
+   "resumo": "Annul a purchase document",
+   "descricao": "Cancels a purchase document with a mandatory cancellation reason.",
+   "etiqueta": "Purchases",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Purchase document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "Cancellation reason, between 1 and 50 characters."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/saft-exports",
+   "resumo": "Start a SAF-T export",
+   "descricao": "Queues an asynchronous SAF-T (PT) export for the requested period and\nreturns a `process_id` to poll via `GET /saft-exports/{processId}`.\nSAF-T version and export type are fixed to the only supported values\n(1.04_01 / Faturação).",
+   "etiqueta": "SAF-T Exports",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "export_type"
+    ],
+    "properties": {
+     "export_type": {
+      "type": "string",
+      "enum": [
+       "annual",
+       "monthly",
+       "date_range"
+      ]
+     },
+     "year": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "month": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 12
+     },
+     "start_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "end_date": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "format": "date"
+     },
+     "use_company_address": {
+      "type": "boolean"
+     },
+     "morada": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "codpostal": {
+      "type": [
+       "string",
+       "null"
+      ]
+     },
+     "localidade": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   },
+   "respostas": [
+    "202",
+    "403",
+    "409",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/saft-exports/{processId}",
+   "resumo": "Get a SAF-T export's status",
+   "descricao": "Returns the current status of the export. When `status` is `completed`\nthe payload includes `download_url`; when `failed` it includes\n`error_message`.",
+   "etiqueta": "SAF-T Exports",
+   "parametros": [
+    {
+     "nome": "processId",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "The process_id returned when the export was created.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/saft-exports/{processId}/download",
+   "resumo": "Download a SAF-T export file",
+   "descricao": "Streams the generated ZIP file. Only available when the export status\nis `completed`.",
+   "etiqueta": "SAF-T Exports",
+   "parametros": [
+    {
+     "nome": "processId",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "The process_id returned when the export was created.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "400",
+    "404",
+    "410"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/sales",
+   "resumo": "List sales documents",
+   "descricao": "Returns paginated finalized sales documents for the API key dedicated series.",
+   "etiqueta": "Sales",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    {
+     "nome": "document_type",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    {
+     "nome": "status",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/sales",
+   "resumo": "Create a sales document",
+   "descricao": "Creates and finalizes a sales document in the API key dedicated series.\n\nCustomers configured for electronic invoicing (client `settings.print_type` 2 or 3) must\nhave a full billing address, otherwise the request fails with 422. For print_type 3 the\nCIUS-PT XML is sent to Saphety right after finalization; if that submission fails the\ndocument is still issued (201) and the failure is reported in `meta.integration_warning`\n— check `data.electronic_invoice.saphety_status` and resend from the desktop app.",
+   "etiqueta": "Sales",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "customer",
+     "document",
+     "items"
+    ],
+    "properties": {
+     "pdf": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+     },
+     "email": {
+      "type": [
+       "object",
+       "null"
+      ],
+      "description": "Optional: email the generated PDF after the document is finalized.\nWhen omitted, no email is sent. When `to` is omitted, the document\nclient's email is used. Best-effort — a failed send is reported in\nthe response `meta.email_warning` and does not fail creation.",
+      "properties": {
+       "to": {
+        "type": [
+         "array",
+         "null"
+        ],
+        "description": "Primary recipients (TO).",
+        "items": {
+         "type": "string",
+         "format": "email"
+        }
+       },
+       "cc": {
+        "type": [
+         "array",
+         "null"
+        ],
+        "description": "Carbon-copy recipients (CC).",
+        "items": {
+         "type": "string",
+         "format": "email"
+        }
+       }
+      }
+     },
+     "customer": {
+      "type": "object",
+      "description": "Customer billed by the sales document. Not required for credit\nnotes (type NC), whose customer is derived from the credited\nsource documents.",
+      "required": [
+       "code"
+      ],
+      "properties": {
+       "code": {
+        "type": "string",
+        "description": "Customer code."
+       }
+      }
+     },
+     "document": {
+      "type": "object",
+      "description": "Sales document metadata.",
+      "required": [
+       "type"
+      ],
+      "properties": {
+       "type": {
+        "type": "string",
+        "description": "Sales document type acronym. Allowed types: FA, FR, FS, NC, GT, GR, FP, ORC. NC = credit note (see items origin_id / origin_line_id); GT/GR = transport guides (require a transport block); FP/ORC = proforma / quote."
+       },
+       "series": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Document series code. The API key dedicated series is used when omitted."
+       },
+       "issue_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date",
+        "description": "Document issue date in YYYY-MM-DD format."
+       },
+       "auto_confirm": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the document should be finalized automatically."
+       },
+       "payment_option_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Payment option identifier."
+       },
+       "payment_method_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Payment method identifier."
+       },
+       "warehouse_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Warehouse identifier used for stock movements."
+       },
+       "salesman_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Salesman code assigned to the document."
+       },
+       "reference": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "External document reference."
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Document notes. Use \\n to separate lines."
+       },
+       "commitment_number": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "B2G commitment number (LCPA), max 50 characters. Sent as CIUS-PT BT-19 cbc:AccountingCost; defaults to the customer's settings.commitment_number when omitted. Optional.",
+        "maxLength": 50
+       },
+       "requesting_service": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "B2G requesting service of the public customer, max 50 characters. Sent as CIUS-PT BT-10 cbc:BuyerReference; defaults to the customer's settings.requesting_service when omitted. Optional.",
+        "maxLength": 50
+       },
+       "tax_included": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether item prices already include tax."
+       },
+       "retention": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "description": "Withholding retention percentage.",
+        "minimum": 0,
+        "maximum": 100
+       },
+       "currency": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "ISO 4217 currency code.",
+        "maxLength": 3
+       },
+       "without_values": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Transport guides (GT/GR) only: when true, every line is issued with price 0 (\"documento sem valores\")."
+       }
+      }
+     },
+     "items": {
+      "type": "array",
+      "description": "Sales document lines. For invoices (FA, FR, FS): product_reference, quantity and\nunit_price_net are required. For credit notes (NC): each item\ninstead references a credited source line via origin_id (source\ndocument id from a previous POST /sales response) and\norigin_line_id (the items[].id of that document); quantity is\noptional and defaults to the line's remaining creditable quantity.",
+      "items": {
+       "type": "object",
+       "required": [
+        "product_reference",
+        "quantity",
+        "unit_price_net"
+       ],
+       "properties": {
+        "product_reference": {
+         "type": "string",
+         "description": "Product reference sold in this line. Required for invoices; ignored for credit notes."
+        },
+        "quantity": {
+         "type": "number",
+         "description": "Quantity. Required for invoices; optional for credit notes (defaults to the line's remaining creditable quantity)."
+        },
+        "unit_price_net": {
+         "type": "number",
+         "description": "Unit price. Required for invoices/proforma/quote; optional for credit notes (taken from the source line) and transport guides (may be omitted / zeroed via document.without_values).",
+         "minimum": 0
+        },
+        "notes": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Line notes. Use \\n to separate lines."
+        },
+        "origin_id": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Credit note only: source document id (a previous POST /sales `data.id`) whose line is being credited. Required per credited line, but may be omitted for a Desconto/Rappel product line."
+        },
+        "origin_line_id": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Credit note only: source line id (an `items[].id` of the source document). Required per credited line, but may be omitted for a Desconto/Rappel product line."
+        }
+       }
+      }
+     },
+     "transport": {
+      "type": "object",
+      "description": "Transport data for goods movement. Required for transport guides\n(GT/GR): both `load` and `delivery` blocks must be complete. The\nload `date_time` (movement start) must be at/after now — AT rejects\na past start time.",
+      "properties": {
+       "vehicle_registration": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Vehicle registration number (optional even for transport guides)."
+       },
+       "load": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "description": "Loading address data.",
+        "properties": {
+         "address": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "Loading street address."
+         },
+         "city": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "Loading city."
+         },
+         "postal_code": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "Loading postal code."
+         },
+         "country_code": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "Loading country code.",
+          "maxLength": 2
+         },
+         "date_time": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "format": "date-time",
+          "description": "Loading date and time (movement start; must be at/after now for AT)."
+         }
+        }
+       },
+       "delivery": {
+        "type": [
+         "object",
+         "null"
+        ],
+        "description": "Delivery address data.",
+        "properties": {
+         "address": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "Delivery street address."
+         },
+         "city": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "Delivery city."
+         },
+         "postal_code": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "Delivery postal code."
+         },
+         "country_code": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "description": "Delivery country code.",
+          "maxLength": 2
+         },
+         "date_time": {
+          "type": [
+           "string",
+           "null"
+          ],
+          "format": "date-time",
+          "description": "Delivery date and time (must be on/after the load date)."
+         }
+        }
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/sales/{id}",
+   "resumo": "Get a sales document",
+   "descricao": "Returns one sales document with public payload and PDF URL when available.",
+   "etiqueta": "Sales",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Sales document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "pdf",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "Deprecated and ignored: the response always includes pdf_url, an authenticated link that renders the PDF on demand.",
+     "esquema": {
+      "type": "boolean",
+      "default": true
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/sales/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Sales",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Sales document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "501"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/sales/{id}/pdf",
+   "resumo": "Download the PDF of a sales document",
+   "descricao": "Renders the document the first time it is requested and serves the cached copy after\nthat (annulling the document produces a fresh render). Use the `pdf_url` returned by\nthe other sales endpoints. Only finalized documents have a PDF.",
+   "etiqueta": "Sales",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Sales document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "409",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/sales/{id}/xml",
+   "resumo": "Download the CIUS-PT XML of a sales document",
+   "descricao": "Returns the UBL 2.1 CIUS-PT XML of a finalized FA, FR, FS or NC document whose customer\nis configured for electronic invoicing (client `settings.print_type` 2 or 3) — the same\nfile the desktop \"download XML (CIUS-PT)\" action produces and, for print_type 3, the one\nsubmitted to Saphety. Use the `xml_url` returned by the other sales endpoints; it is null\nwhenever the XML does not apply to the document.",
+   "etiqueta": "Sales",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Sales document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "409",
+    "502"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/sales/{id}/annul",
+   "resumo": "Annul a sales document",
+   "descricao": "Cancels a sales document with a mandatory cancellation reason.",
+   "etiqueta": "Sales",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Sales document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "Cancellation reason, between 1 and 50 characters."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/salesmen",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Salesmen",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/salesmen",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Salesmen",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "code",
+     "name"
+    ],
+    "properties": {
+     "code": {
+      "type": "string",
+      "description": "Salesman code used as the public identifier."
+     },
+     "name": {
+      "type": "string",
+      "description": "Salesman display name."
+     },
+     "mobile": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Salesman mobile phone number."
+     },
+     "active": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Whether the salesman is active."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "409",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/salesmen/{code}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Salesmen",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/salesmen/{code}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Salesmen",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "code",
+     "name"
+    ],
+    "properties": {
+     "code": {
+      "type": "string",
+      "description": "Salesman code used as the public identifier."
+     },
+     "name": {
+      "type": "string",
+      "description": "Salesman display name."
+     },
+     "mobile": {
+      "type": [
+       "string",
+       "null"
+      ],
+      "description": "Salesman mobile phone number."
+     },
+     "active": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Whether the salesman is active."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "409",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "DELETE",
+   "caminho": "/salesmen/{code}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Salesmen",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/schedules",
+   "resumo": "List schedules",
+   "descricao": "Returns paginated recurring schedules for the API key dedicated series.",
+   "etiqueta": "Schedules",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/schedules",
+   "resumo": "Create a schedule",
+   "descricao": "Creates a recurring schedule and its template document in the API key dedicated series.",
+   "etiqueta": "Schedules",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "schedule",
+     "customer",
+     "document",
+     "items"
+    ],
+    "properties": {
+     "schedule": {
+      "type": "object",
+      "description": "Recurring schedule configuration.",
+      "required": [
+       "description",
+       "frequency",
+       "start_date"
+      ],
+      "properties": {
+       "description": {
+        "type": "string",
+        "description": "Schedule description."
+       },
+       "frequency": {
+        "type": "string",
+        "enum": [
+         "daily",
+         "weekly",
+         "monthly",
+         "monthly_last_day",
+         "bi_monthly",
+         "quarterly",
+         "quad_monthly",
+         "semi_annual",
+         "annual"
+        ],
+        "description": "Recurrence frequency."
+       },
+       "start_date": {
+        "type": "string",
+        "format": "date",
+        "description": "First scheduled generation date in YYYY-MM-DD format."
+       },
+       "end_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date",
+        "description": "Last scheduled generation date in YYYY-MM-DD format."
+       },
+       "auto_confirm": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether generated documents should be confirmed automatically."
+       },
+       "send_email": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether generated documents should be emailed automatically."
+       },
+       "recipient_email": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "email",
+        "description": "Email recipient for generated documents."
+       }
+      }
+     },
+     "customer": {
+      "type": "object",
+      "description": "Customer used by generated documents.",
+      "required": [
+       "code"
+      ],
+      "properties": {
+       "code": {
+        "type": "string",
+        "description": "Customer code."
+       }
+      }
+     },
+     "document": {
+      "type": "object",
+      "description": "Template document metadata used for each generated document.",
+      "required": [
+       "type"
+      ],
+      "properties": {
+       "type": {
+        "type": "string",
+        "description": "Generated document type acronym."
+       },
+       "series": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Document series code. The API key dedicated series is used when omitted."
+       },
+       "payment_type": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Payment type used by the generated document."
+       },
+       "warehouse_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Warehouse identifier used by the generated document."
+       },
+       "currency": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "ISO 4217 currency code.",
+        "maxLength": 3
+       },
+       "reference": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "External document reference."
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Document notes. Use \\n to separate lines."
+       },
+       "commitment_number": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "B2G commitment number (LCPA), max 50 characters. Copied to each generated document and sent as CIUS-PT BT-19 cbc:AccountingCost; defaults to the customer's settings.commitment_number when omitted. Optional.",
+        "maxLength": 50
+       },
+       "requesting_service": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "B2G requesting service of the public customer, max 50 characters. Copied to each generated document and sent as CIUS-PT BT-10 cbc:BuyerReference; defaults to the customer's settings.requesting_service when omitted. Optional.",
+        "maxLength": 50
+       }
+      }
+     },
+     "items": {
+      "type": "array",
+      "description": "Template document lines used for each generated document.",
+      "items": {
+       "type": "object",
+       "required": [
+        "product_reference",
+        "quantity",
+        "unit_price"
+       ],
+       "properties": {
+        "product_reference": {
+         "type": "string",
+         "description": "Product reference."
+        },
+        "quantity": {
+         "type": "number",
+         "description": "Quantity."
+        },
+        "unit_price": {
+         "type": "number",
+         "description": "Unit price."
+        },
+        "discount": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Line discount percentage.",
+         "minimum": 0,
+         "maximum": 100
+        },
+        "notes": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Line notes. Use \\n to separate lines."
+        }
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/schedules/{id}",
+   "resumo": "Get a schedule",
+   "descricao": "Returns one recurring schedule by ID.",
+   "etiqueta": "Schedules",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Schedule ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/schedules/{id}",
+   "resumo": "Update a schedule",
+   "descricao": "Partially updates a recurring schedule and its template document.",
+   "etiqueta": "Schedules",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Schedule ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "schedule",
+     "customer",
+     "document",
+     "items"
+    ],
+    "properties": {
+     "schedule": {
+      "type": "object",
+      "description": "Recurring schedule configuration.",
+      "required": [
+       "description",
+       "frequency",
+       "start_date"
+      ],
+      "properties": {
+       "description": {
+        "type": "string",
+        "description": "Schedule description."
+       },
+       "frequency": {
+        "type": "string",
+        "enum": [
+         "daily",
+         "weekly",
+         "monthly",
+         "monthly_last_day",
+         "bi_monthly",
+         "quarterly",
+         "quad_monthly",
+         "semi_annual",
+         "annual"
+        ],
+        "description": "Recurrence frequency."
+       },
+       "start_date": {
+        "type": "string",
+        "format": "date",
+        "description": "First scheduled generation date in YYYY-MM-DD format."
+       },
+       "end_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date",
+        "description": "Last scheduled generation date in YYYY-MM-DD format."
+       },
+       "auto_confirm": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether generated documents should be confirmed automatically."
+       },
+       "send_email": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether generated documents should be emailed automatically."
+       },
+       "recipient_email": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "email",
+        "description": "Email recipient for generated documents."
+       }
+      }
+     },
+     "customer": {
+      "type": "object",
+      "description": "Customer used by generated documents.",
+      "required": [
+       "code"
+      ],
+      "properties": {
+       "code": {
+        "type": "string",
+        "description": "Customer code."
+       }
+      }
+     },
+     "document": {
+      "type": "object",
+      "description": "Template document metadata used for each generated document.",
+      "required": [
+       "type"
+      ],
+      "properties": {
+       "type": {
+        "type": "string",
+        "description": "Generated document type acronym."
+       },
+       "series": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Document series code. The API key dedicated series is used when omitted."
+       },
+       "payment_type": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Payment type used by the generated document."
+       },
+       "warehouse_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Warehouse identifier used by the generated document."
+       },
+       "currency": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "ISO 4217 currency code.",
+        "maxLength": 3
+       },
+       "reference": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "External document reference."
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Document notes. Use \\n to separate lines."
+       },
+       "commitment_number": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "B2G commitment number (LCPA), max 50 characters. Copied to each generated document and sent as CIUS-PT BT-19 cbc:AccountingCost; defaults to the customer's settings.commitment_number when omitted. Optional.",
+        "maxLength": 50
+       },
+       "requesting_service": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "B2G requesting service of the public customer, max 50 characters. Copied to each generated document and sent as CIUS-PT BT-10 cbc:BuyerReference; defaults to the customer's settings.requesting_service when omitted. Optional.",
+        "maxLength": 50
+       }
+      }
+     },
+     "items": {
+      "type": "array",
+      "description": "Template document lines used for each generated document.",
+      "items": {
+       "type": "object",
+       "required": [
+        "product_reference",
+        "quantity",
+        "unit_price"
+       ],
+       "properties": {
+        "product_reference": {
+         "type": "string",
+         "description": "Product reference."
+        },
+        "quantity": {
+         "type": "number",
+         "description": "Quantity."
+        },
+        "unit_price": {
+         "type": "number",
+         "description": "Unit price."
+        },
+        "discount": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Line discount percentage.",
+         "minimum": 0,
+         "maximum": 100
+        },
+        "notes": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Line notes. Use \\n to separate lines."
+        }
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "DELETE",
+   "caminho": "/schedules/{id}",
+   "resumo": "Delete a schedule",
+   "descricao": "Deletes a recurring schedule and its template document when present.",
+   "etiqueta": "Schedules",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Schedule ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/schedules/{id}/next-documents",
+   "resumo": "Preview next schedule documents",
+   "descricao": "Returns the next planned run date and generated document dates for a schedule.",
+   "etiqueta": "Schedules",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Schedule ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/schedules/{id}/activate",
+   "resumo": "Activate a schedule",
+   "descricao": "Marks a recurring schedule as active.",
+   "etiqueta": "Schedules",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Schedule ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/schedules/{id}/deactivate",
+   "resumo": "Deactivate a schedule",
+   "descricao": "Marks a recurring schedule as inactive.",
+   "etiqueta": "Schedules",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Schedule ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/series",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Series",
+   "parametros": [],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/stocks",
+   "resumo": "List stock documents",
+   "descricao": "Returns paginated stock movement documents for the API key dedicated series.",
+   "etiqueta": "Stock",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    {
+     "nome": "status",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/stocks",
+   "resumo": "Create a stock document",
+   "descricao": "Creates and finalizes a stock movement document in the API key dedicated series.",
+   "etiqueta": "Stock",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "document",
+     "movement",
+     "items"
+    ],
+    "properties": {
+     "pdf": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+     },
+     "document": {
+      "type": "object",
+      "description": "Stock document metadata.",
+      "required": [
+       "type"
+      ],
+      "properties": {
+       "type": {
+        "type": "string",
+        "description": "Stock document type acronym. Allowed types: IN, ES, SS."
+       },
+       "system_entry_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date-time",
+        "description": "System entry date."
+       },
+       "auto_confirm": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the document should be finalized automatically."
+       },
+       "reference": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "External document reference."
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Document notes. Use \\n to separate lines."
+       },
+       "currency": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "ISO 4217 currency code.",
+        "maxLength": 3
+       },
+       "pdf": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+       }
+      }
+     },
+     "movement": {
+      "type": "object",
+      "description": "Stock movement origin and destination.",
+      "properties": {
+       "source_warehouse_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Source warehouse identifier."
+       },
+       "destination_warehouse_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Destination warehouse identifier."
+       }
+      }
+     },
+     "items": {
+      "type": "array",
+      "description": "Stock movement lines.",
+      "items": {
+       "type": "object",
+       "required": [
+        "product_reference",
+        "quantity",
+        "unit_price_net",
+        "taxes"
+       ],
+       "properties": {
+        "product_reference": {
+         "type": "string",
+         "description": "Product reference moved in this line."
+        },
+        "quantity": {
+         "type": "number",
+         "description": "Quantity moved."
+        },
+        "unit_price_net": {
+         "type": "number",
+         "description": "Net unit price without tax.",
+         "minimum": 0
+        },
+        "taxes": {
+         "type": "array",
+         "description": "Tax rows applied to this line.",
+         "items": {
+          "type": "object",
+          "required": [
+           "tax_rate"
+          ],
+          "properties": {
+           "tax_rate": {
+            "type": "number",
+            "description": "Tax rate percentage.",
+            "minimum": 0
+           },
+           "exemption_code": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Tax exemption code when tax rate is zero.",
+            "maxLength": 20
+           },
+           "exemption_reason": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Tax exemption legal reason."
+           }
+          }
+         }
+        },
+        "notes": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Line notes. Use \\n to separate lines."
+        }
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/stocks/{id}",
+   "resumo": "Get a stock document",
+   "descricao": "Returns one stock movement document with public payload and PDF URL when available.",
+   "etiqueta": "Stock",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Stock document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "pdf",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "Deprecated and ignored: the response always includes pdf_url, an authenticated link that renders the PDF on demand.",
+     "esquema": {
+      "type": "boolean",
+      "default": true
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/stocks/{id}",
+   "resumo": "Update a stock document",
+   "descricao": "Updates a stock movement document by ID when it belongs to the API key dedicated series.",
+   "etiqueta": "Stock",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Stock document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "document",
+     "movement",
+     "items"
+    ],
+    "properties": {
+     "pdf": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+     },
+     "document": {
+      "type": "object",
+      "description": "Stock document metadata.",
+      "required": [
+       "type"
+      ],
+      "properties": {
+       "type": {
+        "type": "string",
+        "description": "Stock document type acronym. Allowed types: IN, ES, SS."
+       },
+       "system_entry_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date-time",
+        "description": "System entry date."
+       },
+       "auto_confirm": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Whether the document should be finalized automatically."
+       },
+       "reference": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "External document reference."
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Document notes. Use \\n to separate lines."
+       },
+       "currency": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "ISO 4217 currency code.",
+        "maxLength": 3
+       },
+       "pdf": {
+        "type": [
+         "boolean",
+         "null"
+        ],
+        "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+       }
+      }
+     },
+     "movement": {
+      "type": "object",
+      "description": "Stock movement origin and destination.",
+      "properties": {
+       "source_warehouse_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Source warehouse identifier."
+       },
+       "destination_warehouse_id": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Destination warehouse identifier."
+       }
+      }
+     },
+     "items": {
+      "type": "array",
+      "description": "Stock movement lines.",
+      "items": {
+       "type": "object",
+       "required": [
+        "product_reference",
+        "quantity",
+        "unit_price_net",
+        "taxes"
+       ],
+       "properties": {
+        "product_reference": {
+         "type": "string",
+         "description": "Product reference moved in this line."
+        },
+        "quantity": {
+         "type": "number",
+         "description": "Quantity moved."
+        },
+        "unit_price_net": {
+         "type": "number",
+         "description": "Net unit price without tax.",
+         "minimum": 0
+        },
+        "taxes": {
+         "type": "array",
+         "description": "Tax rows applied to this line.",
+         "items": {
+          "type": "object",
+          "required": [
+           "tax_rate"
+          ],
+          "properties": {
+           "tax_rate": {
+            "type": "number",
+            "description": "Tax rate percentage.",
+            "minimum": 0
+           },
+           "exemption_code": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Tax exemption code when tax rate is zero.",
+            "maxLength": 20
+           },
+           "exemption_reason": {
+            "type": [
+             "string",
+             "null"
+            ],
+            "description": "Tax exemption legal reason."
+           }
+          }
+         }
+        },
+        "notes": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "Line notes. Use \\n to separate lines."
+        }
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/stocks/{id}/pdf",
+   "resumo": "Download the PDF of a stock document",
+   "descricao": "Renders on first request, cached afterwards (a new render follows an annulment). Use the\n`pdf_url` returned by the other stock endpoints. Only finalized documents have a PDF.",
+   "etiqueta": "Stock",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "409",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/stocks/{id}/annul",
+   "resumo": "Annul a stock document",
+   "descricao": "Cancels a stock movement document with a mandatory cancellation reason.",
+   "etiqueta": "Stock",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Stock document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "Cancellation reason, between 1 and 50 characters."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/suppliers",
+   "resumo": "List suppliers",
+   "descricao": "Returns paginated supplier records visible to the authenticated API key.",
+   "etiqueta": "Suppliers",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/suppliers",
+   "resumo": "Create a supplier",
+   "descricao": "Creates a supplier using the public nested supplier payload.",
+   "etiqueta": "Suppliers",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "identity",
+     "addresses"
+    ],
+    "properties": {
+     "identity": {
+      "type": "object",
+      "description": "Supplier identity data.",
+      "required": [
+       "name",
+       "tax_id",
+       "country_code"
+      ],
+      "properties": {
+       "code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Supplier code used as the public identifier.",
+        "maxLength": 20
+       },
+       "name": {
+        "type": "string",
+        "description": "Supplier legal or commercial name.",
+        "maxLength": 500
+       },
+       "tax_id": {
+        "type": "string",
+        "description": "Supplier tax identification number.",
+        "maxLength": 20
+       },
+       "country_code": {
+        "type": "string",
+        "description": "ISO 3166-1 alpha-2 country code.",
+        "maxLength": 2
+       },
+       "region_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Regional code for tax or address classification.",
+        "maxLength": 10
+       },
+       "person_type": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "L",
+         "F",
+         null
+        ],
+        "description": "Person type: L for legal entity, F for individual."
+       }
+      }
+     },
+     "addresses": {
+      "type": "array",
+      "description": "Supplier addresses.",
+      "items": {
+       "type": "object",
+       "required": [
+        "name",
+        "type",
+        "country_code",
+        "address",
+        "postal_code",
+        "city"
+       ],
+       "properties": {
+        "name": {
+         "type": "string",
+         "maxLength": 1000
+        },
+        "type": {
+         "type": "string",
+         "enum": [
+          "billing",
+          "shipping"
+         ]
+        },
+        "country_code": {
+         "type": "string",
+         "maxLength": 2
+        },
+        "address": {
+         "type": "string",
+         "maxLength": 500
+        },
+        "postal_code": {
+         "type": "string",
+         "maxLength": 50
+        },
+        "city": {
+         "type": "string",
+         "maxLength": 100
+        },
+        "id": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "street_number": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "maxLength": 20
+        },
+        "state": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "maxLength": 100
+        },
+        "neighborhood": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "maxLength": 100
+        },
+        "address_extra": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "maxLength": 500
+        },
+        "is_main": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        },
+        "active": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        }
+       }
+      }
+     },
+     "contacts": {
+      "type": [
+       "array",
+       "null"
+      ],
+      "description": "Supplier contacts.",
+      "items": {
+       "type": "object",
+       "required": [
+        "type",
+        "value",
+        "country_code"
+       ],
+       "properties": {
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "maxLength": 200
+        },
+        "type": {
+         "type": "string",
+         "enum": [
+          "mobile",
+          "phone",
+          "email"
+         ]
+        },
+        "value": {
+         "type": "string",
+         "maxLength": 200
+        },
+        "country_code": {
+         "type": "string",
+         "maxLength": 2
+        },
+        "id": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "active": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        }
+       }
+      }
+     },
+     "billing": {
+      "type": "object",
+      "description": "Supplier billing defaults.",
+      "properties": {
+       "payment_option_id": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "tax_entity_id": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "global_discount": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "minimum": 0
+       },
+       "line_discount": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "minimum": 0
+       },
+       "apply_retention_tax": {
+        "type": [
+         "boolean",
+         "null"
+        ]
+       },
+       "retention_tax_rate": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "minimum": 0
+       },
+       "currency_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "maxLength": 10
+       }
+      }
+     },
+     "settings": {
+      "type": "object",
+      "description": "Supplier settings and notes.",
+      "properties": {
+       "website": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "maxLength": 500
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "maxLength": 500
+       },
+       "locked": {
+        "type": [
+         "boolean",
+         "null"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/suppliers/{code}",
+   "resumo": "Get a supplier",
+   "descricao": "Returns one supplier by public supplier code.",
+   "etiqueta": "Suppliers",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Supplier public code.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/suppliers/{code}",
+   "resumo": "Update a supplier",
+   "descricao": "Partially updates a supplier by public supplier code.",
+   "etiqueta": "Suppliers",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Supplier public code.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "identity",
+     "addresses"
+    ],
+    "properties": {
+     "identity": {
+      "type": "object",
+      "description": "Supplier identity data.",
+      "required": [
+       "name",
+       "tax_id",
+       "country_code"
+      ],
+      "properties": {
+       "code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Supplier code used as the public identifier.",
+        "maxLength": 20
+       },
+       "name": {
+        "type": "string",
+        "description": "Supplier legal or commercial name.",
+        "maxLength": 500
+       },
+       "tax_id": {
+        "type": "string",
+        "description": "Supplier tax identification number.",
+        "maxLength": 20
+       },
+       "country_code": {
+        "type": "string",
+        "description": "ISO 3166-1 alpha-2 country code.",
+        "maxLength": 2
+       },
+       "region_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Regional code for tax or address classification.",
+        "maxLength": 10
+       },
+       "person_type": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "enum": [
+         "L",
+         "F",
+         null
+        ],
+        "description": "Person type: L for legal entity, F for individual."
+       }
+      }
+     },
+     "addresses": {
+      "type": "array",
+      "description": "Supplier addresses.",
+      "items": {
+       "type": "object",
+       "required": [
+        "name",
+        "type",
+        "country_code",
+        "address",
+        "postal_code",
+        "city"
+       ],
+       "properties": {
+        "name": {
+         "type": "string",
+         "maxLength": 1000
+        },
+        "type": {
+         "type": "string",
+         "enum": [
+          "billing",
+          "shipping"
+         ]
+        },
+        "country_code": {
+         "type": "string",
+         "maxLength": 2
+        },
+        "address": {
+         "type": "string",
+         "maxLength": 500
+        },
+        "postal_code": {
+         "type": "string",
+         "maxLength": 50
+        },
+        "city": {
+         "type": "string",
+         "maxLength": 100
+        },
+        "id": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "street_number": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "maxLength": 20
+        },
+        "state": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "maxLength": 100
+        },
+        "neighborhood": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "maxLength": 100
+        },
+        "address_extra": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "maxLength": 500
+        },
+        "is_main": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        },
+        "active": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        }
+       }
+      }
+     },
+     "contacts": {
+      "type": [
+       "array",
+       "null"
+      ],
+      "description": "Supplier contacts.",
+      "items": {
+       "type": "object",
+       "required": [
+        "type",
+        "value",
+        "country_code"
+       ],
+       "properties": {
+        "name": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "maxLength": 200
+        },
+        "type": {
+         "type": "string",
+         "enum": [
+          "mobile",
+          "phone",
+          "email"
+         ]
+        },
+        "value": {
+         "type": "string",
+         "maxLength": 200
+        },
+        "country_code": {
+         "type": "string",
+         "maxLength": 2
+        },
+        "id": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "active": {
+         "type": [
+          "boolean",
+          "null"
+         ]
+        }
+       }
+      }
+     },
+     "billing": {
+      "type": "object",
+      "description": "Supplier billing defaults.",
+      "properties": {
+       "payment_option_id": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "tax_entity_id": {
+        "type": [
+         "string",
+         "null"
+        ]
+       },
+       "global_discount": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "minimum": 0
+       },
+       "line_discount": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "minimum": 0
+       },
+       "apply_retention_tax": {
+        "type": [
+         "boolean",
+         "null"
+        ]
+       },
+       "retention_tax_rate": {
+        "type": [
+         "number",
+         "null"
+        ],
+        "minimum": 0
+       },
+       "currency_code": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "maxLength": 10
+       }
+      }
+     },
+     "settings": {
+      "type": "object",
+      "description": "Supplier settings and notes.",
+      "properties": {
+       "website": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "maxLength": 500
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "maxLength": 500
+       },
+       "locked": {
+        "type": [
+         "boolean",
+         "null"
+        ]
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "DELETE",
+   "caminho": "/suppliers/{code}",
+   "resumo": "Delete a supplier",
+   "descricao": "Hides a supplier when no documents are associated.",
+   "etiqueta": "Suppliers",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Supplier public code.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/treasury/payments/pending-documents",
+   "resumo": "List pending supplier purchase documents that can be settled by a payment",
+   "descricao": "",
+   "etiqueta": "Treasury Payments",
+   "parametros": [
+    {
+     "nome": "supplier_code",
+     "em": "query",
+     "obrigatorio": true,
+     "descricao": "Supplier code used to list unpaid purchase documents available for settlement.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/treasury/payments",
+   "resumo": "List supplier payments",
+   "descricao": "Returns paginated finalized supplier payments for the API key dedicated series.",
+   "etiqueta": "Treasury Payments",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    {
+     "nome": "status",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/treasury/payments",
+   "resumo": "Create and finalize a supplier payment",
+   "descricao": "",
+   "etiqueta": "Treasury Payments",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "supplier",
+     "document",
+     "payments",
+     "allocations"
+    ],
+    "properties": {
+     "pdf": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+     },
+     "supplier": {
+      "type": "object",
+      "description": "Supplier information for the payment.",
+      "required": [
+       "code"
+      ],
+      "properties": {
+       "code": {
+        "type": "string",
+        "description": "Supplier code that identifies the supplier receiving the payment."
+       }
+      }
+     },
+     "document": {
+      "type": "object",
+      "description": "Payment document metadata.",
+      "properties": {
+       "issue_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "format": "date-time",
+        "description": "Payment issue date."
+       },
+       "currency": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "ISO 4217 currency code.",
+        "maxLength": 3
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Internal or supplier-facing notes for the payment. Use \\n to separate lines."
+       }
+      }
+     },
+     "payments": {
+      "type": "array",
+      "description": "Payment methods and amounts used to pay the supplier.",
+      "items": {
+       "type": "object",
+       "required": [
+        "payment_method_id",
+        "amount"
+       ],
+       "properties": {
+        "payment_method_id": {
+         "type": "string",
+         "description": "Payment method identifier."
+        },
+        "amount": {
+         "type": "number",
+         "description": "Amount paid with this payment method."
+        },
+        "amount_tendered": {
+         "type": [
+          "number",
+          "null"
+         ],
+         "description": "Amount tendered before change, when applicable."
+        }
+       }
+      }
+     },
+     "allocations": {
+      "type": "array",
+      "description": "Purchase documents and amounts settled by this payment.",
+      "items": {
+       "type": "object",
+       "required": [
+        "document_type",
+        "purchase_id",
+        "amount"
+       ],
+       "properties": {
+        "document_type": {
+         "type": "string",
+         "description": "Type of the purchase document being settled. Allowed types: CFA, CFS, CFR."
+        },
+        "purchase_id": {
+         "type": "string",
+         "description": "Identifier of the purchase document being settled."
+        },
+        "amount": {
+         "type": "number",
+         "description": "Amount to allocate to the selected purchase document."
+        }
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/treasury/payments/{id}",
+   "resumo": "Get a supplier payment",
+   "descricao": "",
+   "etiqueta": "Treasury Payments",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Payment document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "pdf",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "Deprecated and ignored: the response always includes pdf_url, an authenticated link that renders the PDF on demand.",
+     "esquema": {
+      "type": "boolean",
+      "default": true
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/treasury/payments/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Treasury Payments",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Payment document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "501"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/treasury/payments/{id}/pdf",
+   "resumo": "Download the PDF of a supplier payment document",
+   "descricao": "Renders on first request, cached afterwards (a new render follows an annulment). Use the\n`pdf_url` returned by the other payment endpoints. Only finalized documents have a PDF.",
+   "etiqueta": "Treasury Payments",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "409",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/treasury/payments/{id}/annul",
+   "resumo": "Annul a supplier payment",
+   "descricao": "",
+   "etiqueta": "Treasury Payments",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Payment document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "Cancellation reason, between 1 and 50 characters."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/treasury/receipts/pending-documents",
+   "resumo": "List pending customer documents that can be settled by a receipt",
+   "descricao": "",
+   "etiqueta": "Treasury Receipts",
+   "parametros": [
+    {
+     "nome": "customer_code",
+     "em": "query",
+     "obrigatorio": true,
+     "descricao": "Customer code used to list unpaid documents available for settlement.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/treasury/receipts",
+   "resumo": "List customer receipts",
+   "descricao": "Returns paginated finalized customer receipts for the API key dedicated series.",
+   "etiqueta": "Treasury Receipts",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    },
+    {
+     "nome": "status",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/treasury/receipts",
+   "resumo": "Create and finalize a customer receipt",
+   "descricao": "",
+   "etiqueta": "Treasury Receipts",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "customer",
+     "document",
+     "allocations"
+    ],
+    "properties": {
+     "pdf": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Deprecated and ignored: the response always includes pdf_url, a link that renders the PDF on demand."
+     },
+     "email": {
+      "type": [
+       "object",
+       "null"
+      ],
+      "description": "Optional: email the generated PDF after the receipt is finalized.\nWhen omitted, no email is sent. When `to` is omitted, the document\nclient's email is used. Best-effort — a failed send is reported in\nthe response `meta.email_warning` and does not fail creation.",
+      "properties": {
+       "to": {
+        "type": [
+         "array",
+         "null"
+        ],
+        "items": {
+         "type": "string",
+         "format": "email"
+        }
+       },
+       "cc": {
+        "type": [
+         "array",
+         "null"
+        ],
+        "items": {
+         "type": "string",
+         "format": "email"
+        }
+       }
+      }
+     },
+     "customer": {
+      "type": "object",
+      "description": "Customer information for the receipt.",
+      "required": [
+       "code"
+      ],
+      "properties": {
+       "code": {
+        "type": "string",
+        "description": "Customer code that identifies the customer receiving the receipt."
+       }
+      }
+     },
+     "document": {
+      "type": "object",
+      "description": "Receipt document metadata.",
+      "required": [
+       "payment_method_id"
+      ],
+      "properties": {
+       "issue_date": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Receipt issue date in YYYY-MM-DD format. Defaults to the current date when omitted."
+       },
+       "payment_method_id": {
+        "type": "string",
+        "description": "Payment method identifier used to settle the allocated documents."
+       },
+       "currency": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "ISO 4217 currency code."
+       },
+       "notes": {
+        "type": [
+         "string",
+         "null"
+        ],
+        "description": "Internal or customer-facing notes for the receipt. Use \\n to separate lines."
+       }
+      }
+     },
+     "allocations": {
+      "type": "array",
+      "description": "Documents and amounts settled by this receipt.",
+      "items": {
+       "type": "object",
+       "required": [
+        "document_type",
+        "document_id",
+        "amount"
+       ],
+       "properties": {
+        "document_type": {
+         "type": "string",
+         "description": "Type of the document being settled. Allowed types: FA, NC, FAR."
+        },
+        "document_id": {
+         "type": "string",
+         "description": "Identifier of the document being settled."
+        },
+        "amount": {
+         "type": "number",
+         "description": "Amount to allocate to the selected document."
+        }
+       }
+      }
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/treasury/receipts/{id}",
+   "resumo": "Get a customer receipt",
+   "descricao": "",
+   "etiqueta": "Treasury Receipts",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Receipt document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "pdf",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "Deprecated and ignored: the response always includes pdf_url, an authenticated link that renders the PDF on demand.",
+     "esquema": {
+      "type": "boolean",
+      "default": true
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/treasury/receipts/{id}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Treasury Receipts",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Receipt document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "501"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/treasury/receipts/{id}/pdf",
+   "resumo": "Download the PDF of a receipt",
+   "descricao": "Renders on first request, cached afterwards (a new render follows an annulment). Use the\n`pdf_url` returned by the other receipt endpoints. Only finalized receipts have a PDF.",
+   "etiqueta": "Treasury Receipts",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "409",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/treasury/receipts/{id}/annul",
+   "resumo": "Annul a customer receipt",
+   "descricao": "",
+   "etiqueta": "Treasury Receipts",
+   "parametros": [
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "Receipt document ID.",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "properties": {
+     "reason": {
+      "type": "string",
+      "description": "Cancellation reason, between 1 and 50 characters."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/units",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Units",
+   "parametros": [
+    {
+     "nome": "page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1
+     }
+    },
+    {
+     "nome": "per_page",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "integer",
+       "null"
+      ],
+      "minimum": 1,
+      "maximum": 100
+     }
+    },
+    {
+     "nome": "search",
+     "em": "query",
+     "obrigatorio": false,
+     "descricao": "",
+     "esquema": {
+      "type": [
+       "string",
+       "null"
+      ]
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "422",
+    "500"
+   ]
+  },
+  {
+   "metodo": "POST",
+   "caminho": "/units",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Units",
+   "parametros": [],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "code",
+     "description"
+    ],
+    "properties": {
+     "code": {
+      "type": "string",
+      "description": "Unit code used as the public identifier."
+     },
+     "description": {
+      "type": "string",
+      "description": "Unit description."
+     },
+     "active": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Whether the unit is active."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "201",
+    "409",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/units/{code}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Units",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "500"
+   ]
+  },
+  {
+   "metodo": "PATCH",
+   "caminho": "/units/{code}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Units",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": {
+    "type": "object",
+    "required": [
+     "code",
+     "description"
+    ],
+    "properties": {
+     "code": {
+      "type": "string",
+      "description": "Unit code used as the public identifier."
+     },
+     "description": {
+      "type": "string",
+      "description": "Unit description."
+     },
+     "active": {
+      "type": [
+       "boolean",
+       "null"
+      ],
+      "description": "Whether the unit is active."
+     }
+    }
+   },
+   "respostas": [
+    "200",
+    "404",
+    "409",
+    "422"
+   ]
+  },
+  {
+   "metodo": "DELETE",
+   "caminho": "/units/{code}",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Units",
+   "parametros": [
+    {
+     "nome": "code",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "422"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/warehouses",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "Warehouses",
+   "parametros": [],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "500"
+   ]
+  },
+  {
+   "metodo": "GET",
+   "caminho": "/public/{fqdn}/{resource}/{id}/pdf",
+   "resumo": "",
+   "descricao": "",
+   "etiqueta": "PublicDocumentPdf",
+   "parametros": [
+    {
+     "nome": "fqdn",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "resource",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    },
+    {
+     "nome": "id",
+     "em": "path",
+     "obrigatorio": true,
+     "descricao": "",
+     "esquema": {
+      "type": "string"
+     }
+    }
+   ],
+   "corpo": null,
+   "respostas": [
+    "200",
+    "404",
+    "502"
+   ]
+  }
+ ]
+}

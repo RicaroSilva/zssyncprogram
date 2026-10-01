@@ -2,13 +2,14 @@
  *  eliminar dos Perfis (mesma ideia do RecursoAdmin do financial). Fica em
  *  texto na base de dados (zsgo_web_permissao_recurso.recurso), por isso
  *  acrescentar um recurso aqui não precisa de alterar tabelas. */
-export const RECURSOS = ["RESUMO", "FATURACAO", "CLIENTES", "TAREFAS", "HISTORICO", "UTILIZADORES", "PERFIS"] as const;
+export const RECURSOS = ["RESUMO", "FATURACAO", "CLIENTES", "ZSGO", "TAREFAS", "HISTORICO", "UTILIZADORES", "PERFIS"] as const;
 export type Recurso = (typeof RECURSOS)[number];
 
 export const NOME_RECURSO: Record<Recurso, string> = {
   RESUMO: "Resumo",
   FATURACAO: "Faturação",
   CLIENTES: "Clientes",
+  ZSGO: "ZSGO (gestão direta)",
   TAREFAS: "Tarefas agendadas",
   HISTORICO: "Histórico",
   UTILIZADORES: "Utilizadores",
@@ -21,6 +22,7 @@ export const DESTINO_RECURSO: Record<Recurso, string> = {
   RESUMO: "/resumo",
   FATURACAO: "/faturacao",
   CLIENTES: "/clientes",
+  ZSGO: "/zsgo",
   TAREFAS: "/tarefas",
   HISTORICO: "/historico",
   UTILIZADORES: "/utilizadores",

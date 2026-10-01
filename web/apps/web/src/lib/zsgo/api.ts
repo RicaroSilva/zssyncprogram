@@ -252,6 +252,44 @@ export class ZsgoApi {
   async procurarVendas(texto: string): Promise<DocumentoZsgo[]> {
     return (await this.listarVendas(1, 20, texto)).documentos;
   }
+
+  /**
+   * Qualquer operação da API (módulo ZSGO da página). Os POST nunca se
+   * repetem sem resposta (ZsgoResultadoIncerto), como nas faturas.
+   * Devolve o estado HTTP e o corpo (já lido como JSON, se for JSON).
+   */
+  async generico(metodo: string, caminho: string, corpo?: unknown): Promise<{ status: number; json: unknown; texto: string }> {
+    const r = await this.pedido(metodo, caminho, {
+      corpo: corpo === undefined ? undefined : JSON.stringify(corpo),
+      timeoutMs: metodo === "GET" ? 30_000 : 120_000,
+      idempotente: metodo !== "POST",
+      descricao: `${metodo} ${caminho.split("?")[0]}`,
+    });
+    let json: unknown = null;
+    try {
+      json = r.corpo ? JSON.parse(r.corpo) : null;
+    } catch {
+      // resposta sem JSON
+    }
+    return { status: r.status, json, texto: r.corpo };
+  }
+
+  /** Ficheiro (PDF, XML, SAF-T): devolve os bytes e o tipo. */
+  async ficheiro(caminho: string): Promise<{ status: number; bytes: ArrayBuffer; tipo: string; nome: string | null }> {
+    await this.limitador.aguardar();
+    const resposta = await fetch(this.baseUrl + caminho, {
+      headers: { Authorization: `Bearer ${this.token}`, Accept: "*/*" },
+      signal: AbortSignal.timeout(60_000),
+      cache: "no-store",
+    });
+    const disposicao = resposta.headers.get("content-disposition");
+    return {
+      status: resposta.status,
+      bytes: await resposta.arrayBuffer(),
+      tipo: resposta.headers.get("content-type") ?? "application/octet-stream",
+      nome: disposicao?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i)?.[1] ?? null,
+    };
+  }
 }
 
 /** Igual ao Java: primeira ocorrência de "code" na resposta. */

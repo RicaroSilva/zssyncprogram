@@ -108,6 +108,24 @@ Outras ferramentas na Faturação:
 - **Notas de crédito** e **Diagnóstico ZSGO** (resposta em bruto do ZSGO,
   para ajustar a leitura ao formato real).
 
+## ZSGO — gestão direta
+
+O menu **ZSGO** dá acesso a tudo o que a API do ZSGO (versão 1.3) permite,
+sem entrar no ZSGO: documentos de venda, clientes, vendedores,
+agendamentos, comissões, recibos (com os documentos por liquidar),
+pagamentos, compras, fornecedores, artigos, famílias, unidades, stocks,
+armazéns, métodos e condições de pagamento, séries, tipos de documento,
+linhas de preço, isenções, países e exportação SAF-T. Consoante a área:
+consultar com filtros, ver o detalhe, criar, editar, eliminar, anular (com
+motivo), PDF, XML (CIUS-PT), ativar/desativar e descarregar.
+
+As páginas e os formulários são gerados a partir da especificação da API
+(`docs/zsgo-api-1.3.yaml`): uma versão nova da API → substituir o ficheiro
+e correr `python3 scripts-zsgo-spec.py` (precisa de `pyyaml`). Permissões:
+recurso **ZSGO** nos Perfis (consultar / criar / editar / eliminar —
+eliminar inclui anular). Cada operação fica no Histórico e na auditoria. As
+áreas de compras, stocks e pagamentos exigem a versão PRO do ZSGO.
+
 ## Tarefas agendadas
 
 Em **Tarefas** ligam-se/desligam-se e marca-se a hora das mesmas três

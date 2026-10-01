@@ -29,6 +29,7 @@ regras de negócio já validadas (ver `../CLAUDE.md`).
 | 2 | Cliente ZSGO e Cyclos em TypeScript (criar/atualizar clientes, criar faturas e notas de crédito, PDF, `invoicenumber`), queries do `config.properties`; **Gerar faturação** com a janela de passos (pré-análise → criar clientes → verificar alterações → atualizar → resumo → emitir), localizador de faturas "Verificar no ZSGO" | ✅ |
 | 3 | "Verificar no ZSGO" à mão (associar nº / autorizar recriar) no detalhe da fatura, documento do ZSGO no detalhe, Conferir com o ZSGO (segundo plano) + filtro "Com diferença", página de notas de crédito, Diagnóstico do ZSGO | ✅ |
 | 4 | Tarefas agendadas (agendador dentro do servidor, mesma tabela e mesma reserva do Java, hora de Lisboa) e páginas Utilizadores/Perfis | ✅ |
+| 4b | Página principal com gráficos (faturado por mês, top clientes, rubricas, regiões) e módulo **ZSGO — gestão direta**: tudo o que a API 1.3 permite (listas com filtros, detalhe, criar/editar/eliminar, anular, PDF/XML, ativar/desativar, documentos por liquidar, SAF-T), gerado a partir da especificação (`docs/zsgo-api-1.3.yaml` → `scripts-zsgo-spec.py`) | ✅ |
 | 5 | Faturação ocasional (produto `ocasionalTransactions`, uma fatura por pagamento, diária) — quando o utilizador especificar | ⏳ |
 | 6 | Desligar o programa em Java | ⏳ |
 

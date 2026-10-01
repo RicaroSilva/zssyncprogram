@@ -68,6 +68,9 @@ faturacao/` e `lib/zsgo/`): qualquer mudança de regra de negócio tem de ser
 feita nos dois lados enquanto ambos existirem. O agendador web
 (`lib/tarefas.ts`) partilha `zsgo_tarefas` com o Java; `ultima_execucao` é
 hora de parede de Lisboa (timestamp sem fuso), como o Java grava.
+Menu ZSGO (`app/(painel)/zsgo/`, `lib/zsgo/recursos.ts`): gerado a partir da
+especificação `web/docs/zsgo-api-1.3.yaml` (→ `lib/zsgo/gerado/especificacao.json`
+via `web/scripts-zsgo-spec.py`); só faz operações que existem na especificação.
 
 ## Por fazer / pedidos em espera
 
