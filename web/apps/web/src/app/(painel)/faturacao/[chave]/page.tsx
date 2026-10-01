@@ -7,6 +7,11 @@ import { nomesUtilizadoresCyclos } from "@/lib/cyclos";
 import { chaveMes, dataHora, euros, nomeMes } from "@/lib/formatos";
 import { Estado } from "@/components/estado";
 import { Notice } from "@/components/notice";
+import { configExiste } from "@/lib/config";
+import { descreverErro } from "@/lib/erros";
+import { lerDocumentoZsgo } from "@/lib/faturacao/conferencia";
+import type { DocumentoZsgo } from "@/lib/zsgo/documento";
+import { VerificarNoZsgo } from "./verificar-zsgo";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +39,19 @@ export default async function PaginaDetalheFatura({ params }: { params: Promise<
     orderBy: { id: "asc" },
   });
   const nomes = await nomesUtilizadoresCyclos([userId, origemId]);
+  const cliente = await prisma.clienteSync.findUnique({ where: { userId }, select: { zsgoCode: true } });
+  const podeResolver = pode(sessao, "FATURACAO", "editar");
+
+  // O documento tal como está no ZSGO (lido na hora, só leitura).
+  let documento: DocumentoZsgo | null = null;
+  let erroDocumento: string | null = null;
+  if (fatura.zsgoSaleId && configExiste()) {
+    try {
+      documento = await lerDocumentoZsgo(fatura.zsgoSaleId);
+    } catch (e) {
+      erroDocumento = descreverErro(e);
+    }
+  }
 
   return (
     <div>
@@ -47,12 +65,18 @@ export default async function PaginaDetalheFatura({ params }: { params: Promise<
         <Estado estado={fatura.status} incerto={fatura.zsgoIncerto} />
       </div>
 
-      {fatura.zsgoIncerto && (
-        <Notice className="mt-6">
-          Da última vez o ZSGO não respondeu ao criar esta fatura, por isso pode já existir lá. A geração seguinte procura-a sozinha
-          (pela referência <code>LP-{userId.toString()}-{origemId.toString()}-{ano}{String(mes).padStart(2, "0")}</code>); se não tiver a certeza, fica para
-          confirmar.
-        </Notice>
+      {fatura.zsgoIncerto && !fatura.zsgoSaleId && (
+        <>
+          <Notice className="mt-6">
+            Da última vez o ZSGO não respondeu ao criar esta fatura, por isso pode já existir lá. A geração seguinte procura-a sozinha (pela referência{" "}
+            <code>
+              LP-{userId.toString()}-{origemId.toString()}-{ano}
+              {String(mes).padStart(2, "0")}
+            </code>
+            ); se não tiver a certeza, fica para confirmar aqui.
+          </Notice>
+          {podeResolver && <VerificarNoZsgo chave={chave} codigoCliente={cliente?.zsgoCode?.toString() ?? null} valor={fatura.valorTotal === null ? null : Number(fatura.valorTotal)} />}
+        </>
       )}
 
       <dl className="bento-card mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -84,6 +108,47 @@ export default async function PaginaDetalheFatura({ params }: { params: Promise<
           <pre className="mt-3 whitespace-pre-wrap break-words rounded-lg border border-destructive-40 bg-destructive-10 p-4 text-sm text-destructive">
             {fatura.ultimoErro}
           </pre>
+        </>
+      )}
+
+      {(documento || erroDocumento) && (
+        <>
+          <h2 className="mt-10 text-2xl font-bold tracking-tight">No ZSGO</h2>
+          {erroDocumento ? (
+            <p className="mt-3 text-sm text-destructive">Não foi possível ler o documento no ZSGO: {erroDocumento}</p>
+          ) : (
+            documento && (
+              <div className="mt-3 overflow-x-auto">
+                <p className="text-sm text-muted-foreground">
+                  {documento.numero ?? documento.id} · {documento.data?.slice(0, 10) ?? "—"} · estado {documento.estado ?? "—"}
+                  {documento.anulado && <span className="font-semibold text-destructive"> · ANULADO</span>} · líquido {euros(documento.liquido)} · IVA {euros(documento.iva)} ·
+                  total <b>{euros(documento.total)}</b>
+                </p>
+                <table className="mt-3 w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-muted-foreground">
+                      <th className="py-2 pr-4">Artigo</th>
+                      <th className="py-2 pr-4 text-right">Preço s/ IVA</th>
+                      <th className="py-2 pr-4 text-right">IVA</th>
+                      <th className="py-2 pr-4 text-right">Total</th>
+                      <th className="py-2">Notas</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {documento.linhas.map((l, i) => (
+                      <tr key={l.id ?? i} className="border-b border-border">
+                        <td className="py-2 pr-4">{l.produto}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{euros(l.precoUnitario)}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{l.taxaIva !== undefined ? `${l.taxaIva}%` : "—"}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums">{euros(l.total)}</td>
+                        <td className="py-2 text-muted-foreground">{l.notas}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          )}
         </>
       )}
 

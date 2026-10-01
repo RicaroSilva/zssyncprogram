@@ -97,6 +97,17 @@ Java: nunca se repete um POST ao ZSGO que ficou sem resposta (a fatura fica
 "Verificar no ZSGO") e a geração seguinte procura-a pela referência
 `LP-cliente-origem-AAAAMM` antes de criar outra.
 
+Outras ferramentas na Faturação:
+
+- **Conferir com o ZSGO** — lê no ZSGO cada fatura do mês e compara o
+  total e o estado; o filtro **Com diferença no ZSGO** mostra as que têm
+  valor diferente ou foram anuladas lá. Só lê do ZSGO.
+- **Verificar no ZSGO** — no detalhe de uma fatura que ficou sem resposta:
+  procurar o nº que existe no ZSGO e **Associar esta fatura**, ou
+  **Não existe — autorizar criar outra vez**.
+- **Notas de crédito** e **Diagnóstico ZSGO** (resposta em bruto do ZSGO,
+  para ajustar a leitura ao formato real).
+
 **Importante durante a transição:** não gerar a faturação do mesmo mês ao
 mesmo tempo no painel em Java e na página web.
 

@@ -14,6 +14,8 @@ import { Notice } from "@/components/notice";
 import { execucaoAtiva } from "@/lib/faturacao/execucao";
 import { nomeMes } from "@/lib/formatos";
 import { BotaoGerar } from "./botao-gerar";
+import { BotaoConferir } from "./botao-conferir";
+import { temDiferenca } from "@/lib/faturacao/conferencia";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,7 @@ const FILTROS: Array<{ valor: string; rotulo: string }> = [
   { valor: "ERRO", rotulo: "Com erro" },
   { valor: "INCERTO", rotulo: "Verificar no ZSGO" },
   { valor: "PENDENTE", rotulo: "Pendentes" },
+  { valor: "DIFERENCA", rotulo: "Com diferença no ZSGO" },
 ];
 
 export default async function PaginaFaturacao({ searchParams }: { searchParams: Promise<{ mes?: string; estado?: string; q?: string; pagina?: string }> }) {
@@ -39,21 +42,33 @@ export default async function PaginaFaturacao({ searchParams }: { searchParams: 
   const where: Prisma.FaturaSyncWhereInput = { ano: mes.ano, mes: mes.mes };
   if (estado === "INCERTO") where.zsgoIncerto = true;
   else if (estado === "ERRO") Object.assign(where, { status: "ERRO", zsgoIncerto: false });
+  else if (estado === "DIFERENCA") where.zsgoConferidoEm = { not: null };
   else if (estado) where.status = estado;
   if (q && /^\d+$/.test(q)) where.OR = [{ userId: BigInt(q) }, { origemId: BigInt(q) }, { zsgoNumero: { contains: q } }];
   else if (q) where.zsgoNumero = { contains: q, mode: "insensitive" };
 
-  const [faturas, total, soma, emCurso] = await Promise.all([
-    prisma.faturaSync.findMany({
-      where,
-      orderBy: [{ status: "asc" }, { userId: "asc" }, { origemId: "asc" }],
-      skip: (pagina - 1) * POR_PAGINA,
-      take: POR_PAGINA,
-    }),
-    prisma.faturaSync.count({ where }),
-    prisma.faturaSync.aggregate({ where, _sum: { valorTotal: true } }),
-    execucaoAtiva(),
-  ]);
+  const ordem: Prisma.FaturaSyncOrderByWithRelationInput[] = [{ status: "asc" }, { userId: "asc" }, { origemId: "asc" }];
+  let faturas;
+  let total: number;
+  let somaValor: number;
+  const emCurso = await execucaoAtiva();
+  if (estado === "DIFERENCA") {
+    // "Com diferença" compara duas colunas (anulada, ou total ZSGO ≠ total
+    // enviado): filtra-se aqui, depois de ler as conferidas do mês.
+    const todas = (await prisma.faturaSync.findMany({ where, orderBy: ordem })).filter(temDiferenca);
+    total = todas.length;
+    somaValor = todas.reduce((acc, f) => acc + Number(f.valorTotal ?? 0), 0);
+    faturas = todas.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA);
+  } else {
+    const [lista, contagem, soma] = await Promise.all([
+      prisma.faturaSync.findMany({ where, orderBy: ordem, skip: (pagina - 1) * POR_PAGINA, take: POR_PAGINA }),
+      prisma.faturaSync.count({ where }),
+      prisma.faturaSync.aggregate({ where, _sum: { valorTotal: true } }),
+    ]);
+    faturas = lista;
+    total = contagem;
+    somaValor = Number(soma._sum.valorTotal ?? 0);
+  }
   const nomes = await nomesUtilizadoresCyclos(faturas.flatMap((f) => [f.userId, f.origemId]));
   const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
   const hrefFiltro = (valor: string) => `/faturacao?mes=${chaveMes(mes)}${valor ? `&estado=${valor}` : ""}`;
@@ -65,6 +80,7 @@ export default async function PaginaFaturacao({ searchParams }: { searchParams: 
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Faturas do mês</h1>
         <div className="flex flex-wrap items-center gap-4">
           <SeletorMes basePath="/faturacao" mes={mes} searchParams={{ estado: estado || undefined }} />
+          {pode(sessao, "FATURACAO", "editar") && !emCurso && <BotaoConferir mes={chaveMes(mes)} />}
           {pode(sessao, "FATURACAO", "criar") && !emCurso && <BotaoGerar mes={chaveMes(mes)} nomeMes={nomeMes(mes)} />}
         </div>
       </div>
@@ -77,7 +93,7 @@ export default async function PaginaFaturacao({ searchParams }: { searchParams: 
         </Notice>
       )}
       <p className="mt-3 max-w-2xl text-lg text-muted-foreground">
-        Uma fatura por cliente e conta de origem. {total} fatura(s), {euros(soma._sum.valorTotal ?? 0)}.
+        Uma fatura por cliente e conta de origem. {total} fatura(s), {euros(somaValor)}.
       </p>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
@@ -112,6 +128,7 @@ export default async function PaginaFaturacao({ searchParams }: { searchParams: 
               <th className="py-2 pr-4">Conta de origem</th>
               <th className="py-2 pr-4">Estado</th>
               <th className="py-2 pr-4 text-right">Valor</th>
+              <th className="py-2 pr-4 text-right">No ZSGO</th>
               <th className="py-2 pr-4">Nº ZSGO</th>
               <th className="py-2 pr-4">Atualizada</th>
               <th className="py-2">Observação</th>
@@ -141,6 +158,9 @@ export default async function PaginaFaturacao({ searchParams }: { searchParams: 
                     <Estado estado={f.status} incerto={f.zsgoIncerto} />
                   </td>
                   <td className="whitespace-nowrap py-2 pr-4 text-right tabular-nums">{euros(f.valorTotal)}</td>
+                  <td className={cn("whitespace-nowrap py-2 pr-4 text-right tabular-nums", temDiferenca(f) ? "font-semibold text-destructive" : "text-muted-foreground")}>
+                    {f.zsgoAnulado ? "Anulada" : f.zsgoErroConferencia ? "Erro ao ler" : f.zsgoConferidoEm ? euros(f.zsgoTotal) : "—"}
+                  </td>
                   <td className="whitespace-nowrap py-2 pr-4">
                     {f.pdfUrl ? (
                       <a href={f.pdfUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline">
@@ -159,7 +179,7 @@ export default async function PaginaFaturacao({ searchParams }: { searchParams: 
             })}
             {faturas.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-6 text-center text-muted-foreground">
+                <td colSpan={8} className="py-6 text-center text-muted-foreground">
                   Sem faturas para este filtro.
                 </td>
               </tr>

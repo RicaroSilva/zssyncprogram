@@ -1,13 +1,21 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
-import { obterSessaoAtual } from "@/lib/auth";
+import { obterSessaoAtual, type Acao } from "@/lib/auth";
 import { pode } from "@/lib/exigir-permissao";
-import { DESTINO_RECURSO, NOME_RECURSO, RECURSOS } from "@/lib/recursos";
+import type { Recurso } from "@/lib/recursos";
 import { LinkMenu } from "@/components/link-menu";
 
-// Áreas que já têm página nesta fase; as restantes aparecem à medida que
-// forem construídas (ver PLANEAMENTO.md).
-const COM_PAGINA = new Set(["RESUMO", "FATURACAO", "CLIENTES", "HISTORICO"]);
+// Menu do painel — cada entrada só aparece a quem pode consultá-la. As
+// restantes áreas (Tarefas, Utilizadores, Perfis) entram à medida que forem
+// construídas (ver PLANEAMENTO.md).
+const MENU: Array<{ href: string; nome: string; recurso: Recurso; acao?: Acao }> = [
+  { href: "/resumo", nome: "Resumo", recurso: "RESUMO" },
+  { href: "/faturacao", nome: "Faturação", recurso: "FATURACAO" },
+  { href: "/notas-credito", nome: "Notas de crédito", recurso: "FATURACAO" },
+  { href: "/clientes", nome: "Clientes", recurso: "CLIENTES" },
+  { href: "/historico", nome: "Histórico", recurso: "HISTORICO" },
+  { href: "/diagnostico", nome: "Diagnóstico ZSGO", recurso: "FATURACAO", acao: "editar" },
+];
 
 export default async function LayoutPainel({ children }: { children: ReactNode }) {
   const sessao = await obterSessaoAtual();
@@ -16,9 +24,9 @@ export default async function LayoutPainel({ children }: { children: ReactNode }
   return (
     <div className="container-fluid py-10">
       <nav className="mb-8 flex flex-wrap items-center gap-6 border-b border-border pb-4 text-sm font-semibold">
-        {RECURSOS.filter((r) => COM_PAGINA.has(r) && pode(sessao, r, "consultar")).map((r) => (
-          <LinkMenu key={r} href={DESTINO_RECURSO[r]}>
-            {NOME_RECURSO[r]}
+        {MENU.filter((m) => pode(sessao, m.recurso, m.acao ?? "consultar")).map((m) => (
+          <LinkMenu key={m.href} href={m.href}>
+            {m.nome}
           </LinkMenu>
         ))}
       </nav>

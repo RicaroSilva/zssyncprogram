@@ -26,7 +26,7 @@ regras de negócio já validadas (ver `../CLAUDE.md`).
 |---|---|---|
 | 1 | Monorepo, tokens de design, login (Keycloak + emergência), perfis, auditoria; Resumo, Faturação (lista + detalhe), Clientes e Histórico — só leitura | ✅ |
 | 2 | Cliente ZSGO e Cyclos em TypeScript (criar/atualizar clientes, criar faturas e notas de crédito, PDF, `invoicenumber`), queries do `config.properties`; **Gerar faturação** com a janela de passos (pré-análise → criar clientes → verificar alterações → atualizar → resumo → emitir), localizador de faturas "Verificar no ZSGO" | ✅ |
-| 3 | "Verificar no ZSGO" à mão (associar nº / autorizar recriar), Conferir com o ZSGO, página de notas de crédito, diagnóstico | ⏳ |
+| 3 | "Verificar no ZSGO" à mão (associar nº / autorizar recriar) no detalhe da fatura, documento do ZSGO no detalhe, Conferir com o ZSGO (segundo plano) + filtro "Com diferença", página de notas de crédito, Diagnóstico do ZSGO | ✅ |
 | 4 | Tarefas agendadas (container `cron`) e páginas Utilizadores/Perfis | ⏳ |
 | 5 | Faturação ocasional (produto `ocasionalTransactions`, uma fatura por pagamento, diária) — quando o utilizador especificar | ⏳ |
 | 6 | Desligar o programa em Java | ⏳ |

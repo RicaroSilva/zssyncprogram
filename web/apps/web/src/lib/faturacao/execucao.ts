@@ -4,6 +4,7 @@ import { descreverErro } from "../erros";
 import { calcularPreview, type Preview } from "./preview";
 import { atualizarClientes, criarClientesEmFalta, verificarAlteracoes, type ClienteDesatualizado } from "./clientes";
 import { emitirFaturas, emitirNotasCredito } from "./mensal";
+import { conferirMes } from "./conferencia";
 
 /**
  * Gerar a faturação do mês, passo a passo (o mesmo que a janela de passos
@@ -44,14 +45,19 @@ const euros = (n: number) => new Intl.NumberFormat("pt-PT", { style: "currency",
 
 /** Grava os passos na BD, no máximo de 700 em 700 ms (mais a última). */
 class RegistoPassos {
-  readonly passos: Passo[] = TITULOS_PASSOS.map((titulo) => ({ titulo, estado: "PENDENTE", detalhe: "" }));
+  readonly passos: Passo[];
   private ultimaGravacao = 0;
   private pendente?: ReturnType<typeof setTimeout>;
 
-  constructor(readonly id: string) {}
+  constructor(
+    readonly id: string,
+    titulos: readonly string[] = TITULOS_PASSOS,
+  ) {
+    this.passos = titulos.map((titulo) => ({ titulo, estado: "PENDENTE", detalhe: "" }));
+  }
 
   static de(id: string, passos: Passo[]): RegistoPassos {
-    const r = new RegistoPassos(id);
+    const r = new RegistoPassos(id, passos.map((p) => p.titulo));
     passos.forEach((p, i) => (r.passos[i] = p));
     return r;
   }
@@ -250,6 +256,41 @@ async function emitir(r: RegistoPassos, ano: number, mes: number, p: Preview | n
       data: { estado: "FALHOU", resultado: `A faturação parou a meio: ${erro}\n\nAs faturas já emitidas ficam; volte a gerar para continuar (as feitas são ignoradas).`, terminadoEm: new Date() },
     });
   }
+}
+
+export const TITULOS_CONFERENCIA = ["Ler as faturas do mês no ZSGO e comparar com o que foi enviado"] as const;
+
+/** Conferir com o ZSGO: lê cada fatura do mês no ZSGO e grava número,
+ *  total, IVA e estado (só lê do ZSGO). Corre em segundo plano. */
+export async function iniciarConferencia(ano: number, mes: number, utilizador: string): Promise<string> {
+  const ativa = await execucaoAtiva();
+  if (ativa) throw new Error(`Há uma faturação/conferência em curso (${ativa.mes}/${ativa.ano}, iniciada por ${ativa.iniciadoPor ?? "alguém"}). Espere que termine.`);
+  const registo = new RegistoPassos("", TITULOS_CONFERENCIA);
+  const exec = await prisma.execucao.create({
+    data: { tipo: "CONFERENCIA", ano, mes, estado: "A_EMITIR", passos: registo.passos as never, iniciadoPor: utilizador },
+  });
+  aCorrer.add(exec.id);
+  void (async () => {
+    const r = new RegistoPassos(exec.id, TITULOS_CONFERENCIA);
+    try {
+      await r.mudar(0, "A_CORRER", "A começar…");
+      const c = await conferirMes(ano, mes, r.progresso(0));
+      const texto = `${c.iguais} iguais, ${c.diferentes} com diferença (valor diferente ou anulada no ZSGO), ${c.erros} não foi possível ler.`;
+      await r.mudar(0, c.diferentes || c.erros ? "AVISO" : "OK", texto);
+      await historico(utilizador, "CONFERIR_ZSGO", `Conferência de ${mes}/${ano} com o ZSGO: ${texto}`);
+      await prisma.execucao.update({
+        where: { id: exec.id },
+        data: { estado: "CONCLUIDA", resultado: c.diferentes ? "Conferência concluída. Veja as faturas com diferença na lista (filtro \"Com diferença\")." : "Conferência concluída.", terminadoEm: new Date() },
+      });
+    } catch (e) {
+      const erro = descreverErro(e);
+      await r.mudar(0, "ERRO", erro);
+      await prisma.execucao.update({ where: { id: exec.id }, data: { estado: "FALHOU", resultado: `A conferência falhou: ${erro}`, terminadoEm: new Date() } });
+    } finally {
+      aCorrer.delete(exec.id);
+    }
+  })();
+  return exec.id;
 }
 
 export async function cancelarExecucao(id: string): Promise<void> {

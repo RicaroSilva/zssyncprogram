@@ -75,6 +75,20 @@ export class LocalizadorFaturas {
     return { tipo: "NAO_EXISTE", motivo: `não há nenhuma fatura deste cliente no ZSGO depois de ${desde}` };
   }
 
+  /** Documentos cujo número é o indicado ("11385", "FR API-FR/11385", …). */
+  async porNumero(texto: string): Promise<DocumentoZsgo[]> {
+    await this.carregar();
+    if (this.falhaLeitura || !this.todos) throw new Error(`não foi possível ler a lista do ZSGO: ${this.falhaLeitura}`);
+    const t = texto.trim();
+    return this.todos.filter(
+      (d) =>
+        t === d.id ||
+        t.toLowerCase() === d.numero?.toLowerCase() ||
+        t === d.numeroSimples ||
+        (!!d.numeroSimples && (t.endsWith(`/${d.numeroSimples}`) || t.endsWith(` ${d.numeroSimples}`)) && (!d.tipo || t.toUpperCase().startsWith(d.tipo.toUpperCase()))),
+    );
+  }
+
   private carregar(): Promise<void> {
     this.carregamento ??= (async () => {
       const lista: DocumentoZsgo[] = [];
