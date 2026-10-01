@@ -10,6 +10,10 @@ import { SeletorMes } from "@/components/seletor-mes";
 import { Estado } from "@/components/estado";
 import { Paginacao } from "@/components/paginacao";
 import { cn } from "@/lib/utils";
+import { Notice } from "@/components/notice";
+import { execucaoAtiva } from "@/lib/faturacao/execucao";
+import { nomeMes } from "@/lib/formatos";
+import { BotaoGerar } from "./botao-gerar";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +43,7 @@ export default async function PaginaFaturacao({ searchParams }: { searchParams: 
   if (q && /^\d+$/.test(q)) where.OR = [{ userId: BigInt(q) }, { origemId: BigInt(q) }, { zsgoNumero: { contains: q } }];
   else if (q) where.zsgoNumero = { contains: q, mode: "insensitive" };
 
-  const [faturas, total, soma] = await Promise.all([
+  const [faturas, total, soma, emCurso] = await Promise.all([
     prisma.faturaSync.findMany({
       where,
       orderBy: [{ status: "asc" }, { userId: "asc" }, { origemId: "asc" }],
@@ -48,6 +52,7 @@ export default async function PaginaFaturacao({ searchParams }: { searchParams: 
     }),
     prisma.faturaSync.count({ where }),
     prisma.faturaSync.aggregate({ where, _sum: { valorTotal: true } }),
+    execucaoAtiva(),
   ]);
   const nomes = await nomesUtilizadoresCyclos(faturas.flatMap((f) => [f.userId, f.origemId]));
   const totalPaginas = Math.max(1, Math.ceil(total / POR_PAGINA));
@@ -58,8 +63,19 @@ export default async function PaginaFaturacao({ searchParams }: { searchParams: 
       <p className="text-sm font-semibold uppercase tracking-wide text-accent">Faturação</p>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Faturas do mês</h1>
-        <SeletorMes basePath="/faturacao" mes={mes} searchParams={{ estado: estado || undefined }} />
+        <div className="flex flex-wrap items-center gap-4">
+          <SeletorMes basePath="/faturacao" mes={mes} searchParams={{ estado: estado || undefined }} />
+          {pode(sessao, "FATURACAO", "criar") && !emCurso && <BotaoGerar mes={chaveMes(mes)} nomeMes={nomeMes(mes)} />}
+        </div>
       </div>
+      {emCurso && (
+        <Notice className="mt-6">
+          Há uma faturação em curso ({nomeMes(emCurso)}, iniciada por {emCurso.iniciadoPor ?? "—"}).{" "}
+          <Link href={`/faturacao/gerar/${emCurso.id}`} className="font-semibold text-accent hover:underline">
+            Abrir a janela de passos
+          </Link>
+        </Notice>
+      )}
       <p className="mt-3 max-w-2xl text-lg text-muted-foreground">
         Uma fatura por cliente e conta de origem. {total} fatura(s), {euros(soma._sum.valorTotal ?? 0)}.
       </p>

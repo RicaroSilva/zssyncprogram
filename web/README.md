@@ -12,7 +12,7 @@ Monorepo pnpm/Turborepo, com a mesma stack e a mesma metodologia do
 - `packages/db` — schema Prisma (só as tabelas `zsgo_*` desta aplicação) e
   `sql/preparar.sql` (cria o que falta, sem apagar nada).
 - `apps/web` — aplicação Next.js única: login (Keycloak), Resumo,
-  Faturação, Clientes e Histórico.
+  Faturação (com **Gerar faturas em falta**), Clientes e Histórico.
 
 ## Linguagens e software usados
 
@@ -68,6 +68,38 @@ Regras para não tocar no Cyclos:
   (As tabelas `zsgo_web_*` são criadas pelo próprio `faturacao` no
   `preparar`, por isso já lhe pertencem.)
 
+## Configuração da faturação (`config.properties`)
+
+As queries e os acessos ao ZSGO e ao Cyclos vêm do **mesmo
+`config.properties` do programa em Java** — as mesmas queries, sem
+alterações (`billing.query`, `creditnote.query`,
+`source.clients.verify.query`, `zsgo.baseUrl`, `zsgo.token`,
+`cyclos.invoice.*`, `invoice.*`…). Copia-se para a pasta `web/` da VM
+(fica fora do git, tem segredos); o docker compose monta-o no container.
+Mudanças nas queries não precisam de rebuild: o ficheiro é relido quando
+muda.
+
+## Gerar a faturação
+
+Em **Faturação**, escolher o mês e **Gerar faturas em falta** abre a janela
+de passos (igual à do painel em Java):
+
+1. Pré-análise do mês.
+2. Criar no ZSGO os clientes que ainda não existem.
+3. Verificar se algum cliente mudou de dados no Cyclos.
+4. Atualizar no ZSGO os clientes alterados.
+5. Resumo e confirmação — nada é emitido sem carregar em **Emitir faturas**.
+6. Emitir faturas e notas de crédito (o PDF e o nº vão para o Cyclos).
+
+Corre no servidor: pode fechar-se a página e voltar depois. Só pode haver
+uma geração de cada vez. As regras contra faturas em duplicado são as do
+Java: nunca se repete um POST ao ZSGO que ficou sem resposta (a fatura fica
+"Verificar no ZSGO") e a geração seguinte procura-a pela referência
+`LP-cliente-origem-AAAAMM` antes de criar outra.
+
+**Importante durante a transição:** não gerar a faturação do mesmo mês ao
+mesmo tempo no painel em Java e na página web.
+
 ## Instalação (Docker, numa VM Ubuntu)
 
 Igual ao financial (secções 1 e 2 do README dele para instalar o Docker e
@@ -76,6 +108,7 @@ obter o código); depois, na pasta `web/`:
 ```bash
 cp .env.example .env
 nano .env          # DATABASE_URL, Keycloak, PRIMEIRO_ADMIN_EMAIL
+cp /caminho/do/config.properties .   # o mesmo do programa em Java
 
 docker compose build
 docker compose up migrate                       # cria as tabelas que faltam
@@ -121,7 +154,7 @@ docker compose up -d web
 
 ```bash
 pnpm install
-echo 'DATABASE_URL=postgresql://…/cyclos' > apps/web/.env.local
+printf 'DATABASE_URL=postgresql://…/cyclos\nCONFIG_PROPERTIES=/caminho/config.properties\n' > apps/web/.env.local
 DATABASE_URL=… pnpm db:preparar
 DATABASE_URL=… PRIMEIRO_ADMIN_EMAIL=… pnpm db:seed
 pnpm --filter @faturacao/db build

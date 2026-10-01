@@ -159,6 +159,26 @@ model RegistoAuditoria {
   @@map("zsgo_web_auditoria")
 }
 
+/// Uma geração de faturação lançada pela página: os passos (com o progresso
+/// de cada um), o resumo para confirmar e o resultado final.
+model Execucao {
+  id           String    @id @default(uuid())
+  tipo         String
+  ano          Int
+  mes          Int
+  /// A_PREPARAR | A_AGUARDAR_CONFIRMACAO | A_EMITIR | CONCLUIDA | FALHOU | CANCELADA
+  estado       String
+  passos       Json      @default("[]")
+  resumo       Json?
+  resultado    String?
+  iniciadoPor  String?   @map("iniciado_por")
+  iniciadoEm   DateTime  @default(now()) @map("iniciado_em")
+  atualizadoEm DateTime  @default(now()) @updatedAt @map("atualizado_em")
+  terminadoEm  DateTime? @map("terminado_em")
+
+  @@map("zsgo_web_execucao")
+}
+
 // ─────────────────────────────────────────────────────────────────────────
 // Controlo da faturação — tabelas JÁ EXISTENTES, partilhadas com o
 // programa em Java (zsgo-client-sync). Não mudar nomes nem tipos aqui sem

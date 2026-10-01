@@ -183,3 +183,21 @@ CREATE TABLE IF NOT EXISTS zsgo_web_auditoria (
 );
 CREATE INDEX IF NOT EXISTS zsgo_web_auditoria_entidade_idx ON zsgo_web_auditoria (entidade, entidade_id);
 CREATE INDEX IF NOT EXISTS zsgo_web_auditoria_utilizador_idx ON zsgo_web_auditoria (utilizador_id, criado_em);
+
+-- Execuções da faturação lançadas pela página (passos, resumo e resultado),
+-- para a janela de passos sobreviver a um refresh e impedir duas ao mesmo tempo.
+CREATE TABLE IF NOT EXISTS zsgo_web_execucao (
+    id             TEXT         PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    tipo           TEXT         NOT NULL,
+    ano            INTEGER      NOT NULL,
+    mes            INTEGER      NOT NULL,
+    estado         TEXT         NOT NULL,
+    passos         JSONB        NOT NULL DEFAULT '[]'::jsonb,
+    resumo         JSONB,
+    resultado      TEXT,
+    iniciado_por   TEXT,
+    iniciado_em    TIMESTAMP(3) NOT NULL DEFAULT now(),
+    atualizado_em  TIMESTAMP(3) NOT NULL DEFAULT now(),
+    terminado_em   TIMESTAMP(3)
+);
+CREATE INDEX IF NOT EXISTS zsgo_web_execucao_iniciado_idx ON zsgo_web_execucao (iniciado_em DESC);

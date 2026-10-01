@@ -4,6 +4,8 @@ const ROTULO: Record<string, string> = {
   SINCRONIZADO: "Emitida",
   ERRO: "Com erro",
   PENDENTE: "Pendente",
+  FATURA_CRIADA: "Criada no ZSGO",
+  PDF_GERADO: "Falta enviar ao Cyclos",
   INCERTO: "Verificar no ZSGO",
 };
 

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { buttonVariants } from "@/components/button";
 import { Notice } from "@/components/notice";
@@ -28,9 +27,11 @@ export default async function PaginaLogin({ searchParams }: { searchParams: Prom
         {mensagem && (
           <p className="mt-4 rounded-lg border border-destructive-40 bg-destructive-10 p-3 text-sm text-destructive">{mensagem}</p>
         )}
-        <Link href="/api/auth/login" className={buttonVariants({ size: "lg", className: "mt-6 w-full" })}>
+        {/* <a> e não <Link>: o Link pré-carrega a rota e isso já iniciava a
+            descoberta OIDC no Keycloak antes de alguém clicar. */}
+        <a href="/api/auth/login" className={buttonVariants({ size: "lg", className: "mt-6 w-full" })}>
           Entrar com Keycloak
-        </Link>
+        </a>
 
         {acessoEmergencia && (
           <>

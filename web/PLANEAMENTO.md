@@ -25,15 +25,14 @@ regras de negócio já validadas (ver `../CLAUDE.md`).
 | # | Conteúdo | Estado |
 |---|---|---|
 | 1 | Monorepo, tokens de design, login (Keycloak + emergência), perfis, auditoria; Resumo, Faturação (lista + detalhe), Clientes e Histórico — só leitura | ✅ |
-| 2 | Cliente ZSGO e Cyclos em TypeScript (criar/atualizar clientes, criar faturas, PDF, `invoicenumber`), queries do config; **Gerar faturação** com a janela de passos (pré-análise → criar clientes → verificar alterações → atualizar → resumo → emitir) | ⏳ |
-| 3 | Notas de crédito, "Verificar no ZSGO" (associar nº / autorizar recriar), Conferir com o ZSGO, diagnóstico | ⏳ |
+| 2 | Cliente ZSGO e Cyclos em TypeScript (criar/atualizar clientes, criar faturas e notas de crédito, PDF, `invoicenumber`), queries do `config.properties`; **Gerar faturação** com a janela de passos (pré-análise → criar clientes → verificar alterações → atualizar → resumo → emitir), localizador de faturas "Verificar no ZSGO" | ✅ |
+| 3 | "Verificar no ZSGO" à mão (associar nº / autorizar recriar), Conferir com o ZSGO, página de notas de crédito, diagnóstico | ⏳ |
 | 4 | Tarefas agendadas (container `cron`) e páginas Utilizadores/Perfis | ⏳ |
 | 5 | Faturação ocasional (produto `ocasionalTransactions`, uma fatura por pagamento, diária) — quando o utilizador especificar | ⏳ |
 | 6 | Desligar o programa em Java | ⏳ |
 
 ## Onde estão as queries
 
-No Java vêm do `config.properties` (`billing.query`, `creditnote.query`,
-`source.clients.query`, `verify.query`). Na web vão ficar num ficheiro de
-configuração montado no container (as mesmas queries, sem mudanças), para o
-utilizador as poder ajustar sem recompilar — tal como hoje.
+No mesmo `config.properties` do Java, montado no container
+(`CONFIG_PROPERTIES`) e relido quando muda — as mesmas queries, sem
+mudanças. Os `?` (JDBC) passam a `$n::integer` (equivalente ao setInt).

@@ -45,10 +45,10 @@ services:
       ADMIN_LOCAL_LOGIN_ENABLED: ${ADMIN_LOCAL_LOGIN_ENABLED:-false}
       ADMIN_LOCAL_LOGIN_USERNAME: ${ADMIN_LOCAL_LOGIN_USERNAME:-}
       ADMIN_LOCAL_LOGIN_PASSWORD_HASH_B64: ${ADMIN_LOCAL_LOGIN_PASSWORD_HASH_B64:-}
-      ZSGO_BASE_URL: ${ZSGO_BASE_URL:-}
-      ZSGO_TOKEN: ${ZSGO_TOKEN:-}
-      CYCLOS_INVOICE_URL: ${CYCLOS_INVOICE_URL:-}
-      CYCLOS_USER: ${CYCLOS_USER:-}
-      CYCLOS_PASSWORD: ${CYCLOS_PASSWORD:-}
+      CONFIG_PROPERTIES: /config/config.properties
+    # O MESMO config.properties do programa em Java (queries, ZSGO, Cyclos).
+    # Fica só nesta VM (tem segredos) — nunca vai para o git.
+    volumes:
+      - ${CONFIG_PROPERTIES_HOST:-./config.properties}:/config/config.properties:ro
     ports:
       - "${WEB_BIND_ADDRESS:-127.0.0.1}:3002:3002"

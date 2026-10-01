@@ -62,7 +62,10 @@ Versão web em curso (Next.js 15 + TypeScript + Prisma, mesma stack, estilo e
 login Keycloak do `charib-dev/financial`). Usa a MESMA base de dados do
 Cyclos e as mesmas tabelas `zsgo_*`; tabelas novas só `zsgo_web_*`, criadas
 por `web/packages/db/sql/preparar.sql`. NUNCA `prisma migrate`/`db push`
-nessa BD. Fases em `web/PLANEAMENTO.md`.
+nessa BD. Fases em `web/PLANEAMENTO.md`. Lê o MESMO `config.properties`
+(CONFIG_PROPERTIES) e replica as regras do Java (`web/apps/web/src/lib/
+faturacao/` e `lib/zsgo/`): qualquer mudança de regra de negócio tem de ser
+feita nos dois lados enquanto ambos existirem.
 
 ## Por fazer / pedidos em espera
 
