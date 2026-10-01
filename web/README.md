@@ -195,4 +195,6 @@ pnpm --filter @faturacao/db build
 pnpm --filter @faturacao/web dev     # http://localhost:3002
 ```
 
+Para experimentar no Windows antes de instalar num servidor: `TESTAR-NO-WINDOWS.md`.
+
 Ver `PLANEAMENTO.md` para as fases e o que já está feito.
