@@ -23,6 +23,24 @@ export interface EstadoDownload {
   feitosNestaExecucao: number;
   errosNestaExecucao: number;
   ultimaMensagem: string;
+  /** Resultado da última pré-análise do S3. */
+  analise: ResultadoAnalise | null;
+}
+
+export interface ResultadoAnalise {
+  em: Date;
+  destino: string;
+  ficheirosNoDestino: number;
+  faturasComLink: number;
+  jaNoDestino: number;
+  porEnviar: number;
+  /** Estavam marcadas como guardadas com outro nome: voltam a ser enviadas com o nome certo. */
+  comNomeAntigo: number;
+  semLink: number;
+  /** Ficheiros no destino que não correspondem a nenhuma fatura (outros nomes, ex. de downloads antigos). */
+  semFatura: number;
+  exemplosSemFatura: string[];
+  exemplosPorEnviar: string[];
 }
 
 const g = globalThis as unknown as { __downloadCegid?: EstadoDownload };
@@ -35,6 +53,7 @@ const estado: EstadoDownload = (g.__downloadCegid ??= {
   feitosNestaExecucao: 0,
   errosNestaExecucao: 0,
   ultimaMensagem: "",
+  analise: null,
 });
 
 export function estadoDownload(): EstadoDownload {
@@ -61,8 +80,8 @@ export function pararDownload(): void {
 }
 
 /** Começa (ou continua) o download. `repetirErros`: tenta outra vez os que falharam. */
-export function iniciarDownload(iniciadoPor: string, repetirErros: boolean): { ok: boolean; erro?: string } {
-  if (estado.aCorrer) return { ok: false, erro: "O download já está a correr." };
+export function iniciarDownload(iniciadoPor: string, repetirErros: boolean, soAnalisar = false): { ok: boolean; erro?: string } {
+  if (estado.aCorrer) return { ok: false, erro: "Já está a correr uma pré-análise ou um download." };
   const armazenamento = armazenamentoConfigurado();
   if (!armazenamento) return { ok: false, erro: "Falta indicar onde guardar: cegid.s3.endpoint (e bucket, access_key, secret_key) ou cegid.pasta no config.properties." };
   Object.assign(estado, {
@@ -73,9 +92,19 @@ export function iniciarDownload(iniciadoPor: string, repetirErros: boolean): { o
     terminadoEm: null,
     feitosNestaExecucao: 0,
     errosNestaExecucao: 0,
-    ultimaMensagem: `A começar (destino: ${armazenamento.descricao})…`,
+    ultimaMensagem: `Pré-análise: a ler os ficheiros que já estão em ${armazenamento.descricao}…`,
   });
-  void correr(armazenamento, repetirErros).finally(() => {
+  const tarefa = async () => {
+    try {
+      await analisar(armazenamento);
+    } catch (e) {
+      estado.ultimaMensagem = `A pré-análise falhou: ${descreverErro(e)}`;
+      return;
+    }
+    if (soAnalisar || estado.pararPedido) return;
+    await correr(armazenamento, repetirErros);
+  };
+  void tarefa().finally(() => {
     estado.aCorrer = false;
     estado.terminadoEm = new Date();
   });
@@ -140,22 +169,120 @@ async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
   }
 }
 
-/** Nomes já atribuídos nesta execução (os downloads correm em paralelo). */
-const gn = globalThis as unknown as { __nomesCegid?: Map<string, number> };
-const nomesEmUso = (gn.__nomesCegid ??= new Map<string, number>());
+/**
+ * Nome do ficheiro = o nº da fatura, como os que já estão no S3:
+ * "FR 2024/3342" → "FR 2024-3342.pdf" (a "/" passa a "-", os espaços ficam).
+ * Se dois documentos tiverem o mesmo nº, o de menor nº interno fica com o
+ * nome e os outros levam "-<nº interno>"; sem nº → "sem-numero-<nº interno>".
+ * Calculado para todas as faturas de uma vez, para ser sempre igual.
+ */
+export function nomeDoNumero(numero: string | null): string {
+  return (numero ?? "")
+    .trim()
+    .replace(/[\/\\]+/g, "-")
+    .replace(/[:*?"<>|\u0000-\u001f]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-/** Nome do ficheiro: só o nº da fatura, direto no bucket ("FT 2025/113" → FT-2025-113.pdf). */
+const gn = globalThis as unknown as { __nomesCegid?: { em: number; nomes: Map<number, string> } };
+
+async function nomesEsperados(): Promise<Map<number, string>> {
+  if (gn.__nomesCegid && Date.now() - gn.__nomesCegid.em < 10 * 60_000) return gn.__nomesCegid.nomes;
+  const linhas = await prisma.$queryRaw<Array<{ mpinv_id: number; document_cw_number: string | null }>>`
+    SELECT mpinv_id, document_cw_number FROM lp_cloudware_monthly_processing_invoices ORDER BY mpinv_id`;
+  const usados = new Set<string>();
+  const nomes = new Map<number, string>();
+  for (const l of linhas) {
+    const base = nomeDoNumero(l.document_cw_number);
+    let nome = base ? base : `sem-numero-${l.mpinv_id}`;
+    if (usados.has(nome.toLowerCase())) nome = `${base}-${l.mpinv_id}`;
+    usados.add(nome.toLowerCase());
+    nomes.set(l.mpinv_id, nome);
+  }
+  gn.__nomesCegid = { em: Date.now(), nomes };
+  return nomes;
+}
+
 async function chaveDe(doc: Pendente, extensao: string): Promise<string> {
-  const numero = (doc.document_cw_number ?? "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  if (!numero) return `${prefixoChaves()}sem-numero-${doc.mpinv_id}.${extensao}`;
-  const chave = `${prefixoChaves()}${numero}.${extensao}`;
-  // Se outro documento já ficou com este nome, não o substituir.
-  const [ocupada] = await prisma.$queryRaw<Array<{ mpinv_id: number }>>`
-    SELECT mpinv_id FROM zsgo_web_cegid_documento WHERE chave = ${chave} AND mpinv_id <> ${doc.mpinv_id} LIMIT 1`;
-  const dono = nomesEmUso.get(chave);
-  if (ocupada || (dono !== undefined && dono !== doc.mpinv_id)) return `${prefixoChaves()}${numero}-${doc.mpinv_id}.${extensao}`;
-  nomesEmUso.set(chave, doc.mpinv_id);
-  return chave;
+  const nome = (await nomesEsperados()).get(doc.mpinv_id) ?? `sem-numero-${doc.mpinv_id}`;
+  return `${prefixoChaves()}${nome}.${extensao}`;
+}
+
+/**
+ * Pré-análise: lê a lista de ficheiros do destino (S3) e compara com as
+ * faturas. As que já lá estão com o nome certo ficam marcadas como
+ * guardadas (não se voltam a enviar); as marcadas como guardadas com outro
+ * nome voltam a "por descarregar", para ficarem com o nome certo.
+ */
+async function analisar(armazenamento: Armazenamento): Promise<ResultadoAnalise> {
+  const prefixo = prefixoChaves();
+  const noDestino = await armazenamento.listar(prefixo, (n) => (estado.ultimaMensagem = `Pré-análise: ${n.toLocaleString("pt-PT")} ficheiro(s) lidos no destino…`));
+  // Comparação sem diferenciar maiúsculas (e .pdf/.PDF).
+  const porNome = new Map<string, { chave: string; tamanho: number }>();
+  for (const [chave, tamanho] of noDestino) porNome.set(chave.toLowerCase(), { chave, tamanho });
+  estado.ultimaMensagem = "Pré-análise: a comparar com as faturas…";
+  gn.__nomesCegid = undefined; // recalcular
+  const nomes = await nomesEsperados();
+  const faturas = await prisma.$queryRaw<Array<{ mpinv_id: number; tem_link: boolean; estado: string | null; chave: string | null }>>`
+    SELECT i.mpinv_id, (i.document_cw_url IS NOT NULL AND i.document_cw_url <> '') AS tem_link, d.estado, d.chave
+    FROM lp_cloudware_monthly_processing_invoices i LEFT JOIN zsgo_web_cegid_documento d ON d.mpinv_id = i.mpinv_id`;
+  const marcarIds: number[] = [];
+  const marcarChaves: string[] = [];
+  const marcarTamanhos: number[] = [];
+  const reporIds: number[] = [];
+  const usadas = new Set<string>();
+  const exemplosPorEnviar: string[] = [];
+  let semLink = 0;
+  let porEnviar = 0;
+  for (const f of faturas) {
+    const nome = nomes.get(f.mpinv_id)!;
+    const achado = porNome.get(`${prefixo}${nome}.pdf`.toLowerCase());
+    if (achado) {
+      usadas.add(achado.chave);
+      if (f.estado !== "OK" || f.chave !== achado.chave) {
+        marcarIds.push(f.mpinv_id);
+        marcarChaves.push(achado.chave);
+        marcarTamanhos.push(achado.tamanho);
+      }
+      continue;
+    }
+    if (!f.tem_link) {
+      semLink++;
+      continue;
+    }
+    porEnviar++;
+    if (exemplosPorEnviar.length < 10) exemplosPorEnviar.push(`${nome}.pdf`);
+    if (f.estado === "OK") reporIds.push(f.mpinv_id);
+  }
+  for (let i = 0; i < marcarIds.length; i += 5000) {
+    await prisma.$executeRaw`
+      INSERT INTO zsgo_web_cegid_documento (mpinv_id, estado, chave, tamanho, tipo, erro, tentativas, atualizado_em)
+      SELECT t.id, 'OK', t.chave, t.tamanho, 'application/pdf', NULL, 0, now()
+      FROM unnest(${marcarIds.slice(i, i + 5000)}::int[], ${marcarChaves.slice(i, i + 5000)}::text[], ${marcarTamanhos.slice(i, i + 5000)}::bigint[]) AS t(id, chave, tamanho)
+      ON CONFLICT (mpinv_id) DO UPDATE SET estado = 'OK', chave = EXCLUDED.chave, tamanho = EXCLUDED.tamanho, erro = NULL, atualizado_em = now()`;
+  }
+  for (let i = 0; i < reporIds.length; i += 5000) {
+    await prisma.$executeRaw`DELETE FROM zsgo_web_cegid_documento WHERE mpinv_id = ANY(${reporIds.slice(i, i + 5000)}::int[])`;
+  }
+  const semFatura = [...noDestino.keys()].filter((k) => !usadas.has(k));
+  const resultado: ResultadoAnalise = {
+    em: new Date(),
+    destino: armazenamento.descricao,
+    ficheirosNoDestino: noDestino.size,
+    faturasComLink: faturas.length - semLink,
+    jaNoDestino: usadas.size,
+    porEnviar,
+    comNomeAntigo: reporIds.length,
+    semLink,
+    semFatura: semFatura.length,
+    exemplosSemFatura: semFatura.slice(0, 10),
+    exemplosPorEnviar,
+  };
+  estado.analise = resultado;
+  const n = (x: number) => x.toLocaleString("pt-PT");
+  estado.ultimaMensagem = `Pré-análise feita: ${n(resultado.jaNoDestino)} já estão no destino, ${n(porEnviar)} por enviar${reporIds.length ? ` (${n(reporIds.length)} com nome antigo voltam a ser enviadas)` : ""}.`;
+  return resultado;
 }
 
 async function descarregarUm(armazenamento: Armazenamento, doc: Pendente): Promise<boolean> {

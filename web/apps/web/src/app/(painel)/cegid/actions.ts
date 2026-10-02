@@ -6,9 +6,10 @@ import { registarAuditoria } from "@/lib/auditoria";
 import { obterIpCliente } from "@/lib/rede-confianca";
 import { contagemDocumentos, estadoDownload, iniciarDownload, pararDownload, testarDocumento, type EstadoDownload } from "@/lib/cegid/descarregar";
 
-export async function iniciarDownloadAction(repetirErros: boolean): Promise<{ ok: boolean; erro?: string }> {
+export async function iniciarDownloadAction(repetirErros: boolean, soAnalisar = false): Promise<{ ok: boolean; erro?: string }> {
   const sessao = await exigirPermissao("FATURACAO", "criar");
-  const r = iniciarDownload(sessao.nomeExibicao, repetirErros);
+  const r = iniciarDownload(sessao.nomeExibicao, repetirErros, soAnalisar);
+  if (soAnalisar) return r;
   if (r.ok) {
     await registarAuditoria({
       utilizadorId: sessao.utilizadorId,

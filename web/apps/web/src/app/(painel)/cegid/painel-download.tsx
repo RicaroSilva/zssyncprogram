@@ -51,7 +51,7 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
         <div>
           <h3 className="font-heading text-base font-semibold">Cópia dos documentos (antes de a licença do Cegid acabar)</h3>
           <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-            Descarrega o PDF de cada fatura pelo link do Cegid e guarda-o {destino ? <b className="font-semibold">({destino})</b> : "no S3"}. Pode parar e continuar quando quiser: continua onde ficou.
+            Antes de descarregar faz sempre uma pré-análise: as faturas que já estão no S3 com o nome do nº (ex. <span className="font-mono text-xs">FR 2024-3342.pdf</span>) não são enviadas outra vez. Descarrega o PDF de cada fatura pelo link do Cegid e guarda-o {destino ? <b className="font-semibold">({destino})</b> : "no S3"}. Pode parar e continuar quando quiser: continua onde ficou.
           </p>
         </div>
         {podeIniciar && (
@@ -76,6 +76,14 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
                   title="Descarrega uma fatura (a mais recente, ou a do nº interno indicado) só para ver se o link funciona. Não guarda nada."
                 >
                   Testar um documento
+                </Button>
+                <Button
+                  variant="outline"
+                  disabled={pendente || !destino}
+                  onClick={() => acao(() => iniciarDownloadAction(false, true))}
+                  title="Lê os ficheiros que já estão no S3 e marca como guardadas as faturas que lá estão com o nome certo. Não descarrega nada."
+                >
+                  Pré-análise do S3
                 </Button>
                 {contagem.comErro > 0 && (
                   <Button variant="outline" disabled={pendente || !destino} onClick={() => acao(() => iniciarDownloadAction(true))}>
@@ -121,6 +129,42 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
           {estado.ultimaMensagem}
           {estado.iniciadoPor ? <span className="text-muted-foreground"> · iniciado por {estado.iniciadoPor}</span> : null}
         </p>
+      )}
+      {estado.analise && (
+        <div className="mt-4 rounded-lg border border-border p-4 text-sm">
+          <p className="font-semibold">
+            Pré-análise do destino{" "}
+            <span className="font-normal text-muted-foreground">
+              ({new Date(estado.analise.em).toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short" })} · {estado.analise.destino})
+            </span>
+          </p>
+          <dl className="mt-3 grid gap-3 sm:grid-cols-4">
+            {[
+              ["Ficheiros no S3", estado.analise.ficheirosNoDestino],
+              ["Faturas já lá", estado.analise.jaNoDestino],
+              ["Por enviar", estado.analise.porEnviar],
+              ["Ficheiros sem fatura", estado.analise.semFatura],
+            ].map(([t, v]) => (
+              <div key={t as string}>
+                <dt className="text-muted-foreground">{t}</dt>
+                <dd className="font-heading text-xl font-bold tabular-nums">{n(v as number)}</dd>
+              </div>
+            ))}
+          </dl>
+          {estado.analise.comNomeAntigo > 0 && (
+            <p className="mt-2 text-muted-foreground">{n(estado.analise.comNomeAntigo)} tinham sido guardadas com outro nome e vão ser enviadas outra vez com o nome da fatura.</p>
+          )}
+          {estado.analise.exemplosPorEnviar.length > 0 && (
+            <p className="mt-2 break-words text-muted-foreground">
+              Por enviar, por exemplo: <span className="font-mono text-xs">{estado.analise.exemplosPorEnviar.join(" · ")}</span>
+            </p>
+          )}
+          {estado.analise.exemplosSemFatura.length > 0 && (
+            <p className="mt-2 break-words text-muted-foreground">
+              No S3 sem fatura correspondente (outros nomes): <span className="font-mono text-xs">{estado.analise.exemplosSemFatura.join(" · ")}</span>
+            </p>
+          )}
+        </div>
       )}
       {teste && (
         <div className={`mt-4 rounded-lg border p-4 text-sm ${teste.ok ? "border-border" : "border-destructive"}`}>

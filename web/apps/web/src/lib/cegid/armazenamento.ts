@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash, createHmac } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve, sep } from "node:path";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { dirname, relative, resolve, sep } from "node:path";
 import { cfgOu } from "../config";
 
 /**
@@ -22,6 +22,8 @@ import { cfgOu } from "../config";
 export interface Armazenamento {
   descricao: string;
   guardar(chave: string, dados: Buffer, tipo: string): Promise<void>;
+  /** Todos os ficheiros que já estão no destino (chave → tamanho), dentro do prefixo. */
+  listar(prefixo: string, progresso?: (n: number) => void): Promise<Map<string, number>>;
   ler(chave: string): Promise<Buffer | null>;
 }
 
@@ -62,6 +64,24 @@ class ArmazenamentoPasta implements Armazenamento {
     await mkdir(dirname(c), { recursive: true });
     await writeFile(c, dados);
   }
+  async listar(prefixo: string) {
+    const r = new Map<string, number>();
+    const percorrer = async (dir: string) => {
+      let entradas;
+      try {
+        entradas = await readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const e of entradas) {
+        const c = resolve(dir, e.name);
+        if (e.isDirectory()) await percorrer(c);
+        else r.set(relative(this.raiz, c).split(sep).join("/"), (await stat(c)).size);
+      }
+    };
+    await percorrer(prefixo ? resolve(this.raiz, prefixo) : this.raiz);
+    return r;
+  }
   async ler(chave: string) {
     try {
       return await readFile(this.caminho(chave));
@@ -82,15 +102,20 @@ class ArmazenamentoS3 implements Armazenamento {
     return `S3 ${this.c.endpoint}/${this.c.bucket}`;
   }
 
-  private async pedido(metodo: "GET" | "PUT", chave: string, corpo?: Buffer, tipo?: string): Promise<Response> {
-    const url = new URL(`${this.c.endpoint}/${codificar(this.c.bucket)}/${codificar(chave)}`);
+  private async pedido(metodo: "GET" | "PUT", chave: string, corpo?: Buffer, tipo?: string, query: Record<string, string> = {}): Promise<Response> {
+    const url = new URL(`${this.c.endpoint}/${codificar(this.c.bucket)}${chave ? `/${codificar(chave)}` : ""}`);
+    const queryCanonica = Object.keys(query)
+      .sort()
+      .map((k) => `${codificar(k).replace(/\//g, "%2F")}=${codificar(query[k]!).replace(/\//g, "%2F")}`)
+      .join("&");
+    url.search = queryCanonica;
     const agora = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
     const dia = agora.slice(0, 8);
     const hashCorpo = sha256(corpo ?? "");
     const cabecalhos: Record<string, string> = { host: url.host, "x-amz-content-sha256": hashCorpo, "x-amz-date": agora };
     if (tipo) cabecalhos["content-type"] = tipo;
     const nomes = Object.keys(cabecalhos).sort();
-    const pedidoCanonico = [metodo, url.pathname, "", ...nomes.map((n) => `${n}:${cabecalhos[n]}`), "", nomes.join(";"), hashCorpo].join("\n");
+    const pedidoCanonico = [metodo, url.pathname, queryCanonica, ...nomes.map((n) => `${n}:${cabecalhos[n]}`), "", nomes.join(";"), hashCorpo].join("\n");
     const ambito = `${dia}/${this.c.regiao}/s3/aws4_request`;
     const texto = ["AWS4-HMAC-SHA256", agora, ambito, sha256(pedidoCanonico)].join("\n");
     const chaveAssinatura = hmac(hmac(hmac(hmac(`AWS4${this.c.segredo}`, dia), this.c.regiao), "s3"), "aws4_request");
@@ -107,6 +132,28 @@ class ArmazenamentoS3 implements Armazenamento {
   async guardar(chave: string, dados: Buffer, tipo: string) {
     const r = await this.pedido("PUT", chave, dados, tipo);
     if (!r.ok) throw new Error(`O S3 respondeu ${r.status} ao guardar ${chave}: ${(await r.text()).slice(0, 300)}`);
+  }
+
+  async listar(prefixo: string, progresso?: (n: number) => void) {
+    const r = new Map<string, number>();
+    let token: string | undefined;
+    const xml = (t: string) => t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+    for (;;) {
+      const q: Record<string, string> = { "list-type": "2", "max-keys": "1000" };
+      if (prefixo) q.prefix = prefixo;
+      if (token) q["continuation-token"] = token;
+      const resp = await this.pedido("GET", "", undefined, undefined, q);
+      const corpo = await resp.text();
+      if (!resp.ok) throw new Error(`O S3 respondeu ${resp.status} ao listar o bucket ${this.c.bucket}: ${corpo.slice(0, 300)}`);
+      for (const m of corpo.matchAll(/<Contents>([\s\S]*?)<\/Contents>/g)) {
+        const chave = m[1]!.match(/<Key>([\s\S]*?)<\/Key>/)?.[1];
+        const tamanho = Number(m[1]!.match(/<Size>(\d+)<\/Size>/)?.[1] ?? 0);
+        if (chave !== undefined) r.set(xml(chave), tamanho);
+      }
+      progresso?.(r.size);
+      token = /<IsTruncated>true<\/IsTruncated>/.test(corpo) ? xml(corpo.match(/<NextContinuationToken>([\s\S]*?)<\/NextContinuationToken>/)?.[1] ?? "") : undefined;
+      if (!token) return r;
+    }
   }
 
   async ler(chave: string) {

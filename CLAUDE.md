@@ -78,7 +78,9 @@ related_to_user_id = fatura emitida a outra pessoa), `..._invoice_lines`
 (rubric_code, total_amount_with_taxes), `lp_cloudware_rubrics_mappings` e
 `lp_cloudware_users_mappings` (user_id → cw_id). SÓ LEITURA nessas tabelas.
 Os PDFs copiam-se para o S3 do SeaweedFS (`cegid.s3.*`) antes de a licença
-acabar; estado em `zsgo_web_cegid_documento`. Os links públicos do Cegid são
+acabar; estado em `zsgo_web_cegid_documento`. Nome no bucket = nº da fatura
+com "/"→"-" ("FR 2024-3342.pdf", formato dos que já lá estavam); pré-análise
+lista o bucket e não reenvia os que já existem. Os links públicos do Cegid são
 `app1.business-pt.cegid.cloud/rus/public-rus/public_links/link/...`.
 
 ## Por fazer / pedidos em espera

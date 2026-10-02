@@ -129,7 +129,7 @@ detalhe com as linhas e a descrição das rubricas, destinatário
 ao link do Cegid (`document_cw_url`; segue redirecionamentos, links do Google
 Drive e páginas com o PDF embutido) e guarda-o no S3 (SeaweedFS) indicado em
 `cegid.s3.*` no `config.properties` (ou numa pasta, `cegid.pasta`), como
-só com o nº da fatura (`FT-2025-113.pdf`), diretamente no bucket. O que já foi guardado fica em
+só com o nº da fatura, como os que já lá estavam ("FR 2024/3342" → `FR 2024-3342.pdf`), diretamente no bucket. Antes de descarregar faz uma pré-análise (lista o bucket): as que já lá estão com esse nome não se enviam outra vez. A chave S3 precisa de permissão de listar o bucket. O que já foi guardado fica em
 `zsgo_web_cegid_documento` (tamanho e SHA-256): pode parar-se e continuar.
 "Testar um documento" mostra o que o link devolve sem guardar nada. Depois
 de guardado, a aplicação abre a cópia e não o link do Cegid.
