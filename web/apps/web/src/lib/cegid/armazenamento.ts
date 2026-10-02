@@ -15,7 +15,7 @@ import { cfgOu } from "../config";
  *   cegid.s3.access_key=…
  *   cegid.s3.secret_key=…
  *   cegid.s3.region=us-east-1       (opcional)
- *   cegid.s3.prefixo=cegid/         (opcional)
+ *   cegid.s3.prefixo=               (opcional; por omissão na raiz do bucket)
  *   cegid.pasta=C:\faturacao\cegid  (só sem S3)
  */
 
@@ -42,7 +42,8 @@ export function armazenamentoConfigurado(): Armazenamento | null {
 
 /** Prefixo das chaves (ex.: "cegid/"). */
 export function prefixoChaves(): string {
-  const p = cfgOu("cegid.s3.prefixo", "cegid/");
+  // Por omissão os ficheiros ficam na raiz do bucket; cegid.s3.prefixo=pasta/ põe-nos numa pasta.
+  const p = cfgOu("cegid.s3.prefixo", "").replace(/^\/+/, "");
   return p && !p.endsWith("/") ? `${p}/` : p;
 }
 

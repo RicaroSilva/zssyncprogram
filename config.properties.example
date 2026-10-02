@@ -392,7 +392,8 @@ creditnote.query=\
 #cegid.s3.access_key=
 #cegid.s3.secret_key=
 #cegid.s3.region=us-east-1
-#cegid.s3.prefixo=cegid/
+# Pasta dentro do bucket (vazio = os PDFs ficam diretamente no bucket):
+#cegid.s3.prefixo=
 # Sem S3, numa pasta:
 #cegid.pasta=C:\\faturacao\\cegid
 # Quantos documentos ao mesmo tempo (1–20) e pausa entre cada um. Se o Cegid

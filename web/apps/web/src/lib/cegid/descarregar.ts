@@ -140,10 +140,10 @@ async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
   }
 }
 
-/** Nome do ficheiro: cegid/2024/03/1234-FT-2024-123-98765.pdf */
+/** Nome do ficheiro, direto no bucket (sem pastas de datas): 1006-FT-2025-113-13.pdf */
 function chaveDe(doc: Pendente, extensao: string): string {
   const numero = (doc.document_cw_number ?? "sem-numero").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  return `${prefixoChaves()}${doc.year}/${String(doc.month).padStart(2, "0")}/${doc.user_id}-${numero}-${doc.mpinv_id}.${extensao}`;
+  return `${prefixoChaves()}${doc.user_id}-${numero}-${doc.mpinv_id}.${extensao}`;
 }
 
 async function descarregarUm(armazenamento: Armazenamento, doc: Pendente): Promise<boolean> {
