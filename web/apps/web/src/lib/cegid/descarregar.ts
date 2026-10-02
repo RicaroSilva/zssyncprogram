@@ -23,6 +23,10 @@ export interface EstadoDownload {
   feitosNestaExecucao: number;
   errosNestaExecucao: number;
   ultimaMensagem: string;
+  /** Em curso: quantos ao mesmo tempo, segundos por documento (média recente) e travões 429 do Cegid. */
+  paralelosAtuais: number;
+  segundosPorDocumento: number;
+  esperas429: number;
   /** Resultado da última pré-análise do S3. */
   analise: ResultadoAnalise | null;
 }
@@ -53,6 +57,9 @@ const estado: EstadoDownload = (g.__downloadCegid ??= {
   feitosNestaExecucao: 0,
   errosNestaExecucao: 0,
   ultimaMensagem: "",
+  paralelosAtuais: 0,
+  segundosPorDocumento: 0,
+  esperas429: 0,
   analise: null,
 });
 
@@ -63,10 +70,10 @@ export function estadoDownload(): EstadoDownload {
 /** Quantos já estão guardados, com erro e por descarregar. */
 export async function contagemDocumentos(): Promise<{ total: number; guardados: number; comErro: number; semLink: number }> {
   const [l] = await prisma.$queryRaw<Array<{ total: bigint; guardados: bigint; com_erro: bigint; sem_link: bigint }>>`
-    SELECT COUNT(*) FILTER (WHERE i.document_cw_url IS NOT NULL AND i.document_cw_url <> '') AS total,
+    SELECT COUNT(*) FILTER (WHERE (i.document_cw_url IS NOT NULL AND i.document_cw_url <> '') OR d.estado = 'OK') AS total,
            COUNT(*) FILTER (WHERE d.estado = 'OK') AS guardados,
            COUNT(*) FILTER (WHERE d.estado = 'ERRO') AS com_erro,
-           COUNT(*) FILTER (WHERE i.document_cw_url IS NULL OR i.document_cw_url = '') AS sem_link
+           COUNT(*) FILTER (WHERE (i.document_cw_url IS NULL OR i.document_cw_url = '') AND d.estado IS DISTINCT FROM 'OK') AS sem_link
     FROM lp_cloudware_monthly_processing_invoices i
     LEFT JOIN zsgo_web_cegid_documento d ON d.mpinv_id = i.mpinv_id`;
   return { total: Number(l?.total ?? 0), guardados: Number(l?.guardados ?? 0), comErro: Number(l?.com_erro ?? 0), semLink: Number(l?.sem_link ?? 0) };
@@ -92,6 +99,9 @@ export function iniciarDownload(iniciadoPor: string, repetirErros: boolean, soAn
     terminadoEm: null,
     feitosNestaExecucao: 0,
     errosNestaExecucao: 0,
+    paralelosAtuais: 0,
+    segundosPorDocumento: 0,
+    esperas429: 0,
     ultimaMensagem: `Pré-análise: a ler os ficheiros que já estão em ${armazenamento.descricao}…`,
   });
   const tarefa = async () => {
@@ -120,50 +130,88 @@ interface Pendente {
   document_cw_url: string;
 }
 
+const lerParalelos = () => Math.max(1, Math.min(40, cfgInt("cegid.download.paralelos", 12)));
+
 async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
-  const paralelos = Math.max(1, Math.min(20, cfgInt("cegid.download.paralelos", 6)));
   const pausa = Math.max(0, cfgInt("cegid.download.pausa_ms", 0));
   let errosSeguidos = 0;
   let paradoPorErros = false;
   let ultimoId = 0;
-  try {
-    for (;;) {
-      if (estado.pararPedido) {
-        if (!paradoPorErros) estado.ultimaMensagem = "Parado a pedido. Carregue em Continuar para retomar onde ficou.";
-        return;
-      }
-      // Os que nunca foram tentados; com "repetir erros", também os que falharam.
+  let acabou = false;
+  const fila: Pendente[] = [];
+  let aEncher: Promise<void> | null = null;
+  // Fila contínua: quando fica com poucos, vai buscar mais 200 (os trabalhadores nunca esperam pelo mais lento).
+  const encher = () =>
+    (aEncher ??= (async () => {
       const lote = await prisma.$queryRaw<Pendente[]>`
         SELECT i.mpinv_id, i.user_id, i.year, i.month, i.document_cw_number, i.document_cw_url
         FROM lp_cloudware_monthly_processing_invoices i
         LEFT JOIN zsgo_web_cegid_documento d ON d.mpinv_id = i.mpinv_id
         WHERE i.mpinv_id > ${ultimoId} AND i.document_cw_url IS NOT NULL AND i.document_cw_url <> ''
           AND (d.mpinv_id IS NULL OR (${repetirErros} AND d.estado = 'ERRO'))
-        ORDER BY i.mpinv_id LIMIT 1000`;
-      if (lote.length === 0) {
-        estado.ultimaMensagem = estado.errosNestaExecucao
-          ? `Terminado: ${estado.feitosNestaExecucao} guardado(s), ${estado.errosNestaExecucao} com erro (pode tentar de novo os que falharam).`
-          : `Terminado: ${estado.feitosNestaExecucao} documento(s) guardado(s) nesta execução.`;
-        return;
+        ORDER BY i.mpinv_id LIMIT 200`;
+      if (lote.length === 0) acabou = true;
+      else {
+        ultimoId = lote[lote.length - 1]!.mpinv_id;
+        fila.push(...lote);
       }
-      ultimoId = lote[lote.length - 1]!.mpinv_id;
-      let i = 0;
-      const trabalhador = async () => {
-        while (i < lote.length && !estado.pararPedido) {
-          const doc = lote[i++]!;
-          const ok = await descarregarUm(armazenamento, doc);
-          errosSeguidos = ok ? 0 : errosSeguidos + 1;
-          if (pausa) await new Promise((r) => setTimeout(r, pausa));
-          if (errosSeguidos >= 50 && !estado.pararPedido) {
-            estado.pararPedido = true;
-            paradoPorErros = true;
-            estado.ultimaMensagem = "Parei: 50 documentos seguidos falharam (o Cegid pode estar em baixo ou os links deixaram de funcionar). Veja o erro na lista e tente mais tarde.";
-          }
+      ajustar();
+    })().finally(() => (aEncher = null)));
+
+  let ativos = 0;
+  let alvo = lerParalelos();
+  let ultimoAjuste = Date.now();
+  const trabalhadores: Promise<void>[] = [];
+  const trabalhador = async () => {
+    ativos++;
+    try {
+      while (!estado.pararPedido) {
+        if (Date.now() - ultimoAjuste > 10_000) ajustar(); // o config.properties pode ter mudado
+        if (ativos > alvo) return; // reduziram os paralelos no config.properties
+        if (fila.length < alvo && !acabou) void encher();
+        if (fila.length === 0) {
+          if (acabou && !aEncher) return;
+          await (aEncher ?? encher());
+          continue;
         }
-      };
-      await Promise.all(Array.from({ length: paralelos }, trabalhador));
-      if (!estado.pararPedido) estado.ultimaMensagem = `A descarregar… ${estado.feitosNestaExecucao} guardado(s) nesta execução (último nº interno ${ultimoId}).`;
+        const doc = fila.shift()!;
+        const inicio = Date.now();
+        const ok = await descarregarUm(armazenamento, doc);
+        const seg = (Date.now() - inicio) / 1000;
+        estado.segundosPorDocumento = estado.segundosPorDocumento ? estado.segundosPorDocumento * 0.95 + seg * 0.05 : seg;
+        errosSeguidos = ok ? 0 : errosSeguidos + 1;
+        if (pausa) await espera(pausa);
+        if (errosSeguidos >= 50 && !estado.pararPedido) {
+          estado.pararPedido = true;
+          paradoPorErros = true;
+          estado.ultimaMensagem = "Parei: 50 documentos seguidos falharam (o Cegid pode estar em baixo ou os links deixaram de funcionar). Veja o erro na lista e tente mais tarde.";
+        }
+        if (!estado.pararPedido && !paradoPorErros) estado.ultimaMensagem = `A descarregar… ${estado.feitosNestaExecucao.toLocaleString("pt-PT")} guardado(s) nesta execução.`;
+      }
+    } finally {
+      ativos--;
+      estado.paralelosAtuais = ativos;
     }
+  };
+  // Lê de novo cegid.download.paralelos a cada lote: pode mudar-se sem parar o download.
+  function ajustar() {
+    ultimoAjuste = Date.now();
+    alvo = lerParalelos();
+    while (ativos < alvo && !estado.pararPedido && !(acabou && fila.length === 0)) trabalhadores.push(trabalhador());
+    estado.paralelosAtuais = Math.min(ativos, alvo);
+  }
+  try {
+    await encher();
+    ajustar();
+    // Esperar por todos, incluindo os que forem criados entretanto.
+    for (let k = 0; k < trabalhadores.length; k++) await trabalhadores[k];
+    if (estado.pararPedido) {
+      if (!paradoPorErros) estado.ultimaMensagem = "Parado a pedido. Carregue em Continuar para retomar onde ficou.";
+      return;
+    }
+    estado.ultimaMensagem = estado.errosNestaExecucao
+      ? `Terminado: ${estado.feitosNestaExecucao} guardado(s), ${estado.errosNestaExecucao} com erro (pode tentar de novo os que falharam).`
+      : `Terminado: ${estado.feitosNestaExecucao} documento(s) guardado(s) nesta execução.`;
   } catch (e) {
     estado.ultimaMensagem = `Parou com erro: ${descreverErro(e)}`;
   }
@@ -359,6 +407,7 @@ async function pedir(u: string, passos?: string[]): Promise<Response> {
     const segundos = Math.min(120, Number(r.headers.get("retry-after")) || 10 * tentativa);
     passos?.push(`429 (demasiados pedidos) — espero ${segundos} s e tento outra vez`);
     travao.ate = Math.max(travao.ate, Date.now() + segundos * 1000);
+    estado.esperas429++;
     await r.arrayBuffer().catch(() => {});
     await espera(segundos * 1000);
   }
@@ -410,7 +459,7 @@ async function seguirEnderecosCegid(texto: string, base: string, passos: string[
     if (arquivo && imagensConhecidas.has(arquivo)) continue; // já se sabe que é o logótipo
     const ehJob = !u.includes("/public-file/");
     for (let vez = 0; vez < (ehJob ? 3 : 1); vez++) {
-      if (vez > 0) await espera(3000);
+      if (vez > 0) await espera(1500 * vez);
       let r: Response;
       try {
         r = await pedir(u, passos);

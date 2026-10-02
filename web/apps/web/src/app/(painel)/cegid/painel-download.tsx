@@ -119,6 +119,11 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
           <p className="mt-1 text-sm text-muted-foreground">
             Ritmo: <b className="font-semibold text-foreground">{n(Math.round(porMinuto))} por minuto</b> · faltam cerca de{" "}
             <b className="font-semibold text-foreground">{duracao(falta / porMinuto)}</b>
+            {estado.paralelosAtuais ? ` · ${estado.paralelosAtuais} ao mesmo tempo` : ""}
+            {estado.segundosPorDocumento ? ` · ${estado.segundosPorDocumento.toFixed(1)} s por fatura` : ""}
+            {estado.esperas429 ? (
+              <span className="text-destructive"> · o Cegid pediu para abrandar {estado.esperas429}×</span>
+            ) : null}
           </p>
         )}
       </div>

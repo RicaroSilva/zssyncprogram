@@ -396,9 +396,10 @@ creditnote.query=\
 #cegid.s3.prefixo=
 # Sem S3, numa pasta:
 #cegid.pasta=C:\\faturacao\\cegid
-# Quantos documentos ao mesmo tempo (1–20) e pausa entre cada um. Se o Cegid
-# responder 429 (demasiados pedidos), todos esperam o tempo que ele pedir.
-#cegid.download.paralelos=6
+# Quantos documentos ao mesmo tempo (1–40; lido de novo durante o download,
+# não é preciso parar). Se o Cegid responder 429 (demasiados pedidos), todos
+# esperam o tempo que ele pedir.
+#cegid.download.paralelos=12
 #cegid.download.pausa_ms=0
 # Quando o link do Cegid abre a página do visualizador (e não o PDF), o
 # endereço do PDF. {url} = endereço final do link, {token} = último bocado.
