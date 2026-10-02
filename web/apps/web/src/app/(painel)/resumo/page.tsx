@@ -89,10 +89,10 @@ function Atalhos() {
   );
 }
 
-export default async function PaginaResumo({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
+export default async function PaginaResumo({ searchParams }: { searchParams: Promise<{ mes?: string; fonte?: string }> }) {
   const sessao = await obterSessaoAtual();
   if (!pode(sessao, "RESUMO", "consultar")) redirect("/");
-  const { mes: mesParam } = await searchParams;
+  const { mes: mesParam, fonte: fonteParam } = await searchParams;
   const mes = lerMes(mesParam);
   const anterior = somarMeses(mes, -1);
   const inicio = somarMeses(mes, -11);
@@ -143,7 +143,9 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
     const c = cegidMes.find((l) => l.ano === m.ano && l.mes === m.mes);
     const zsgo = z?.valor ?? 0;
     const cegid = c?.valor ?? 0;
-    return { m, zsgo, cegid, valor: zsgo + cegid, n: Number(z?.n ?? 0) + Number(c?.n ?? 0) };
+    const nZsgo = Number(z?.n ?? 0);
+    const nCegid = Number(c?.n ?? 0);
+    return { m, zsgo, cegid, valor: zsgo + cegid, nZsgo, nCegid, n: nZsgo + nCegid };
   });
   const detalheOrigem = (zsgo: number, cegid: number, n: number) =>
     `${n} fatura(s)${cegid > 0 ? ` · ZSGO ${euros(zsgo)} · Cegid ${euros(cegid)}` : ""}`;
@@ -158,24 +160,19 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
   const totalCegid = cegidAno.reduce((a, l) => a + (l.valor ?? 0), 0);
   const faturasCegid = cegidAno.reduce((a, l) => a + Number(l.n), 0);
 
-  // Top clientes e rubricas do mês: ZSGO + Cegid juntos.
-  const clientesMes = new Map<string, { valor: number; n: number }>();
-  for (const t of [...topClientes, ...cegidTop]) {
-    const k = t.user_id.toString();
-    const atual = clientesMes.get(k) ?? { valor: 0, n: 0 };
-    clientesMes.set(k, { valor: atual.valor + (t.valor ?? 0), n: atual.n + Number(t.n) });
-  }
-  const top = [...clientesMes.entries()].sort((a, b) => b[1].valor - a[1].valor).slice(0, 10);
-  const rubricasMes = new Map<string, { valor: number; transacoes: number }>();
-  for (const r of [...rubricas.map((r) => ({ rubrica: r.rubrica ?? "—", valor: r.valor, transacoes: r.transacoes })), ...cegidRubricas]) {
-    const atual = rubricasMes.get(r.rubrica) ?? { valor: 0, transacoes: 0 };
-    rubricasMes.set(r.rubrica, { valor: atual.valor + (r.valor ?? 0), transacoes: atual.transacoes + (r.transacoes ?? 0) });
-  }
-  const topRubricas = [...rubricasMes.entries()].sort((a, b) => b[1].valor - a[1].valor).slice(0, 10);
+  // Clientes e rubricas do mês: de um software de cada vez (ZSGO ou Cegid), à escolha em cima.
+  const fonte: "zsgo" | "cegid" = fonteParam === "cegid" && comCegid ? "cegid" : "zsgo";
+  const nomeFonte = fonte === "cegid" ? "Cegid" : "ZSGO";
+  const top = (fonte === "cegid" ? cegidTop : topClientes).map((t) => [t.user_id.toString(), { valor: t.valor ?? 0, n: Number(t.n) }] as const);
+  const topRubricas = (fonte === "cegid" ? cegidRubricas : rubricas)
+    .map((r) => [r.rubrica ?? "—", { valor: r.valor ?? 0, transacoes: r.transacoes ?? 0 }] as const)
+    .sort((a, b) => b[1].valor - a[1].valor)
+    .slice(0, 10);
   const atual = serie[11]!;
   const ant = serie[10]!;
   const contagemClientes = (s: string) => clientes.find((c) => c.status === s)?._count ?? 0;
   const nomes = await nomesUtilizadoresCyclos(top.map(([id]) => BigInt(id)));
+  const hrefFonte = (f: string) => `/resumo?mes=${chaveMes(mes)}${f === "zsgo" ? "" : `&fonte=${f}`}`;
   const linkFaturas = (estado?: string) => `/faturacao?mes=${chaveMes(mes)}${estado ? `&estado=${estado}` : ""}`;
   const contagem = (n: number) => new Intl.NumberFormat("pt-PT").format(n);
 
@@ -183,34 +180,59 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
     <div className="grid gap-8 xl:grid-cols-[250px_minmax(0,1fr)]">
       {pode(sessao, "ZSGO", "criar") ? <Atalhos /> : <div className="hidden xl:block" />}
       <div className="min-w-0">
-      <p className="text-sm font-semibold uppercase tracking-wide text-accent">Faturação</p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm font-semibold uppercase tracking-wide text-accent">Faturação</p>
+        {comCegid && (
+          <nav aria-label="Software de faturação" className="flex gap-1 rounded-full border border-border p-0.5">
+            {(["zsgo", "cegid"] as const).map((f) => (
+              <Link
+                key={f}
+                href={hrefFonte(f)}
+                aria-current={fonte === f ? "page" : undefined}
+                className={cn("rounded-full px-3 py-0.5 text-xs font-semibold uppercase", fonte === f ? "bg-primary-10 text-accent" : "text-muted-foreground hover:text-foreground")}
+              >
+                {f === "zsgo" ? "ZSGO" : "Cegid"}
+              </Link>
+            ))}
+          </nav>
+        )}
+      </div>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Resumo</h1>
-        <SeletorMes basePath="/resumo" mes={mes} />
+        <SeletorMes basePath="/resumo" mes={mes} searchParams={{ fonte: fonte === "cegid" ? "cegid" : undefined }} />
       </div>
 
-      {/* Número principal do mês */}
-      <div className="mt-8 grid gap-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr]">
-        <Link href={linkFaturas("SINCRONIZADO")} className="rounded-card border border-border bg-surface p-6 transition-colors hover:border-foreground-20">
-          <p className="text-sm font-semibold text-muted-foreground">Faturado em {nomeMesTitulo(mes).toLowerCase()}</p>
-          <p className="mt-2 font-heading text-5xl font-bold">{euros(atual.valor)}</p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {ant.valor ? (
-              <span className={cn("font-semibold", atual.valor >= ant.valor ? "text-success" : "text-destructive")}>
-                {atual.valor >= ant.valor ? "▲" : "▼"} {Math.abs(((atual.valor - ant.valor) / ant.valor) * 100).toFixed(0)}%{" "}
-              </span>
-            ) : null}
-            {ant.valor ? `face a ${MESES_CURTOS[ant.m.mes - 1]} (${euros(ant.valor)})` : "sem faturação no mês anterior"}
-          </p>
-          {atual.cegid > 0 && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              ZSGO {euros(atual.zsgo)} · Cegid {euros(atual.cegid)}
+      {/* Faturado no mês, separado por software */}
+      <div className={cn("mt-8 grid gap-4", comCegid ? "lg:grid-cols-[1.3fr_1.3fr_1fr_1fr]" : "lg:grid-cols-[1.4fr_1fr_1fr_1fr]")}>
+        {[
+          { nome: "ZSGO", valor: atual.zsgo, anterior: ant.zsgo, n: atual.nZsgo, href: linkFaturas("SINCRONIZADO") },
+          ...(comCegid ? [{ nome: "Cegid", valor: atual.cegid, anterior: ant.cegid, n: atual.nCegid, href: `/cegid?mes=${chaveMes(mes)}` }] : []),
+        ].map((c) => (
+          <Link key={c.nome} href={c.href} className="rounded-card border border-border bg-surface p-6 transition-colors hover:border-foreground-20">
+            <p className="text-sm font-semibold text-muted-foreground">
+              <span className="text-foreground">{c.nome}</span> · faturado em {nomeMesTitulo(mes).toLowerCase()}
             </p>
-          )}
-        </Link>
-        <Indicador titulo="Faturas emitidas" valor={atual.n} anterior={ant.n} formato={contagem} href={linkFaturas("SINCRONIZADO")} />
-        <Indicador titulo="Com erro" valor={comErro + incertas} formato={contagem} subirEBom={false} href={linkFaturas("ERRO")} detalhe={incertas ? `${incertas} a verificar no ZSGO` : "por corrigir"} />
-        <Indicador titulo="Notas de crédito" valor={notas._count} anterior={notasAnt._count} formato={contagem} subirEBom={false} href={`/notas-credito?mes=${chaveMes(mes)}`} />
+            <p className="mt-2 font-heading text-4xl font-bold">{euros(c.valor)}</p>
+            <p className="mt-1 text-sm">
+              <b className="font-semibold">{contagem(c.n)}</b> <span className="text-muted-foreground">fatura(s) emitida(s)</span>
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {c.anterior ? (
+                <>
+                  <span className={cn("font-semibold", c.valor >= c.anterior ? "text-success" : "text-destructive")}>
+                    {c.valor >= c.anterior ? "▲" : "▼"} {Math.abs(((c.valor - c.anterior) / c.anterior) * 100).toFixed(0)}%
+                  </span>{" "}
+                  face a {MESES_CURTOS[ant.m.mes - 1]} ({euros(c.anterior)})
+                </>
+              ) : (
+                "sem faturação no mês anterior"
+              )}
+            </p>
+          </Link>
+        ))}
+        {!comCegid && <Indicador titulo="Faturas emitidas" valor={atual.n} anterior={ant.n} formato={contagem} href={linkFaturas("SINCRONIZADO")} />}
+        <Indicador titulo="Com erro no ZSGO" valor={comErro + incertas} formato={contagem} subirEBom={false} href={linkFaturas("ERRO")} detalhe={incertas ? `${incertas} a verificar no ZSGO` : "por corrigir"} />
+        <Indicador titulo="Notas de crédito (ZSGO)" valor={notas._count} anterior={notasAnt._count} formato={contagem} subirEBom={false} href={`/notas-credito?mes=${chaveMes(mes)}`} />
       </div>
 
       <div className="mt-6">
@@ -269,7 +291,7 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <GraficoBarras
-          titulo="Clientes com maior faturação"
+          titulo={`Clientes com maior faturação · ${nomeFonte}`}
           subtitulo={nomeMesTitulo(mes)}
           pontos={top.map(([id, t]) => ({
             rotulo: `${id} ${nomes.get(id) ?? ""}`.trim(),
@@ -281,7 +303,7 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
           vazio="Sem faturas emitidas neste mês."
         />
         <GraficoBarras
-          titulo="Faturado por rubrica"
+          titulo={`Faturado por rubrica · ${nomeFonte}`}
           subtitulo={nomeMesTitulo(mes)}
           pontos={topRubricas.map(([rubrica, r]) => ({ rotulo: rubrica, valor: r.valor, detalhe: `${contagem(r.transacoes)} transações` }))}
           formato="euro"
