@@ -8,6 +8,10 @@ import { chaveMes, dataHora, euros, lerMes, nomeMesTitulo, somarMeses } from "@/
 import { SeletorMes } from "@/components/seletor-mes";
 import { GraficoBarras, GraficoColunas } from "@/components/graficos";
 import { cn } from "@/lib/utils";
+import { ArrowRight } from "lucide-react";
+import { faturadoCegidPorAno, faturadoCegidPorMes, rubricasCegid, temHistoricoCegid, topClientesCegid } from "@/lib/cegid/historico";
+import { contagemDocumentos } from "@/lib/cegid/descarregar";
+import { operacoesDe, recursoPorSlug } from "@/lib/zsgo/recursos";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +56,39 @@ function Indicador({
   return href ? <Link href={href}>{corpo}</Link> : corpo;
 }
 
+/** Atalhos "Criar novo" (como no dashboard do ZSGO) — só os que a API e o perfil permitem. */
+const ATALHOS: Array<{ slug: string; nome: string }> = [
+  { slug: "documentos-venda", nome: "Documento de venda" },
+  { slug: "recibos", nome: "Recibo" },
+  { slug: "agendamentos", nome: "Agendamento" },
+  { slug: "clientes", nome: "Cliente" },
+  { slug: "artigos", nome: "Artigo" },
+  { slug: "vendedores", nome: "Vendedor" },
+  { slug: "condicoes-pagamento", nome: "Condição de pagamento" },
+  { slug: "metodos-pagamento", nome: "Método de pagamento" },
+];
+
+function Atalhos() {
+  const lista = ATALHOS.filter((a) => {
+    const r = recursoPorSlug(a.slug);
+    return r && operacoesDe(r).criar;
+  });
+  if (lista.length === 0) return null;
+  return (
+    <nav aria-label="Criar novo" className="space-y-2">
+      {lista.map((a) => (
+        <Link key={a.slug} href={`/zsgo/${a.slug}/novo`} className="flex items-center justify-between gap-3 rounded-card border border-border bg-surface px-4 py-3 transition-colors hover:border-foreground-20">
+          <span>
+            <span className="block text-sm font-semibold">{a.nome}</span>
+            <span className="block text-xs text-muted-foreground">Criar novo</span>
+          </span>
+          <ArrowRight className="h-4 w-4 text-accent" aria-hidden />
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
 export default async function PaginaResumo({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
   const sessao = await obterSessaoAtual();
   if (!pode(sessao, "RESUMO", "consultar")) redirect("/");
@@ -87,20 +124,65 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
     prisma.historico.findMany({ orderBy: { criadoEm: "desc" }, take: 6 }),
   ]);
 
+  // Histórico do Cegid (integração antiga), se as tabelas existirem nesta base de dados.
+  const comCegid = await temHistoricoCegid().catch(() => false);
+  const vazio = <T,>(): T[] => [];
+  const [cegidMes, cegidAno, zsgoAno, cegidTop, cegidRubricas, cegidCopias] = await Promise.all([
+    comCegid ? faturadoCegidPorMes(inicio.ano * 12 + inicio.mes, mes.ano * 12 + mes.mes) : vazio<{ ano: number; mes: number; valor: number | null; n: bigint }>(),
+    comCegid ? faturadoCegidPorAno() : vazio<{ ano: number; valor: number | null; n: bigint }>(),
+    prisma.$queryRaw<Array<{ ano: number; valor: number | null; n: bigint }>>`
+      SELECT ano, SUM(valor_total)::float AS valor, COUNT(*) AS n FROM zsgo_invoice_sync WHERE status = 'SINCRONIZADO' GROUP BY ano`,
+    comCegid ? topClientesCegid(mes.ano, mes.mes) : vazio<{ user_id: bigint; valor: number; n: bigint }>(),
+    comCegid ? rubricasCegid(mes.ano, mes.mes) : vazio<{ rubrica: string; valor: number; transacoes: number }>(),
+    comCegid ? contagemDocumentos() : null,
+  ]);
+
   const serie = Array.from({ length: 12 }, (_, i) => {
     const m = somarMeses(inicio, i);
-    const linha = porMes.find((l) => l.ano === m.ano && l.mes === m.mes);
-    return { m, valor: linha?.valor ?? 0, n: Number(linha?.n ?? 0) };
+    const z = porMes.find((l) => l.ano === m.ano && l.mes === m.mes);
+    const c = cegidMes.find((l) => l.ano === m.ano && l.mes === m.mes);
+    const zsgo = z?.valor ?? 0;
+    const cegid = c?.valor ?? 0;
+    return { m, zsgo, cegid, valor: zsgo + cegid, n: Number(z?.n ?? 0) + Number(c?.n ?? 0) };
   });
+  const detalheOrigem = (zsgo: number, cegid: number, n: number) =>
+    `${n} fatura(s)${cegid > 0 ? ` · ZSGO ${euros(zsgo)} · Cegid ${euros(cegid)}` : ""}`;
+
+  // Por ano: todo o histórico (Cegid desde 2019 + ZSGO).
+  const anos = [...new Set([...cegidAno.map((a) => a.ano), ...zsgoAno.map((a) => a.ano)])].sort((a, b) => a - b);
+  const porAno = anos.map((ano) => {
+    const c = cegidAno.find((a) => a.ano === ano);
+    const z = zsgoAno.find((a) => a.ano === ano);
+    return { ano, zsgo: z?.valor ?? 0, cegid: c?.valor ?? 0, n: Number(z?.n ?? 0) + Number(c?.n ?? 0) };
+  });
+  const totalCegid = cegidAno.reduce((a, l) => a + (l.valor ?? 0), 0);
+  const faturasCegid = cegidAno.reduce((a, l) => a + Number(l.n), 0);
+
+  // Top clientes e rubricas do mês: ZSGO + Cegid juntos.
+  const clientesMes = new Map<string, { valor: number; n: number }>();
+  for (const t of [...topClientes, ...cegidTop]) {
+    const k = t.user_id.toString();
+    const atual = clientesMes.get(k) ?? { valor: 0, n: 0 };
+    clientesMes.set(k, { valor: atual.valor + (t.valor ?? 0), n: atual.n + Number(t.n) });
+  }
+  const top = [...clientesMes.entries()].sort((a, b) => b[1].valor - a[1].valor).slice(0, 10);
+  const rubricasMes = new Map<string, { valor: number; transacoes: number }>();
+  for (const r of [...rubricas.map((r) => ({ rubrica: r.rubrica ?? "—", valor: r.valor, transacoes: r.transacoes })), ...cegidRubricas]) {
+    const atual = rubricasMes.get(r.rubrica) ?? { valor: 0, transacoes: 0 };
+    rubricasMes.set(r.rubrica, { valor: atual.valor + (r.valor ?? 0), transacoes: atual.transacoes + (r.transacoes ?? 0) });
+  }
+  const topRubricas = [...rubricasMes.entries()].sort((a, b) => b[1].valor - a[1].valor).slice(0, 10);
   const atual = serie[11]!;
   const ant = serie[10]!;
   const contagemClientes = (s: string) => clientes.find((c) => c.status === s)?._count ?? 0;
-  const nomes = await nomesUtilizadoresCyclos(topClientes.map((t) => t.user_id));
+  const nomes = await nomesUtilizadoresCyclos(top.map(([id]) => BigInt(id)));
   const linkFaturas = (estado?: string) => `/faturacao?mes=${chaveMes(mes)}${estado ? `&estado=${estado}` : ""}`;
   const contagem = (n: number) => new Intl.NumberFormat("pt-PT").format(n);
 
   return (
-    <div>
+    <div className="grid gap-8 xl:grid-cols-[250px_minmax(0,1fr)]">
+      {pode(sessao, "ZSGO", "criar") ? <Atalhos /> : <div className="hidden xl:block" />}
+      <div className="min-w-0">
       <p className="text-sm font-semibold uppercase tracking-wide text-accent">Faturação</p>
       <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Resumo</h1>
@@ -120,6 +202,11 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
             ) : null}
             {ant.valor ? `face a ${MESES_CURTOS[ant.m.mes - 1]} (${euros(ant.valor)})` : "sem faturação no mês anterior"}
           </p>
+          {atual.cegid > 0 && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              ZSGO {euros(atual.zsgo)} · Cegid {euros(atual.cegid)}
+            </p>
+          )}
         </Link>
         <Indicador titulo="Faturas emitidas" valor={atual.n} anterior={ant.n} formato={contagem} href={linkFaturas("SINCRONIZADO")} />
         <Indicador titulo="Com erro" valor={comErro + incertas} formato={contagem} subirEBom={false} href={linkFaturas("ERRO")} detalhe={incertas ? `${incertas} a verificar no ZSGO` : "por corrigir"} />
@@ -129,11 +216,11 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
       <div className="mt-6">
         <GraficoColunas
           titulo="Faturado por mês"
-          subtitulo={`Últimos 12 meses até ${nomeMesTitulo(mes).toLowerCase()} · faturas emitidas`}
+          subtitulo={`Últimos 12 meses até ${nomeMesTitulo(mes).toLowerCase()} · faturas emitidas${comCegid ? " no ZSGO e no Cegid" : ""}`}
           pontos={serie.map((s) => ({
             rotulo: `${MESES_CURTOS[s.m.mes - 1]}${s.m.mes === 1 || s === serie[0] ? ` ${String(s.m.ano).slice(2)}` : ""}`,
             valor: s.valor,
-            detalhe: `${s.n} fatura(s)`,
+            detalhe: detalheOrigem(s.zsgo, s.cegid, s.n),
             destaque: s === atual,
           }))}
           formato="euro"
@@ -142,13 +229,51 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
         />
       </div>
 
+      {porAno.length > 1 && (
+        <div className={cn("mt-6 grid gap-6", comCegid && "lg:grid-cols-[2fr_1fr]")}>
+          <GraficoColunas
+            titulo="Faturado por ano"
+            subtitulo={comCegid ? "Todo o histórico · Cegid (até à mudança) e ZSGO" : "Todo o histórico no ZSGO"}
+            pontos={porAno.map((a) => ({ rotulo: String(a.ano), valor: a.zsgo + a.cegid, detalhe: detalheOrigem(a.zsgo, a.cegid, a.n), destaque: a.ano === mes.ano }))}
+            formato="euro"
+            formatoEixo="euro-compacto"
+            rotuloValor="Faturado"
+            largura={comCegid ? 650 : 1100}
+          />
+          {comCegid && (
+            <Link href="/cegid" className="rounded-card border border-border bg-surface p-6 transition-colors hover:border-foreground-20">
+              <h3 className="font-heading text-base font-semibold">Histórico Cegid</h3>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {anos.length ? `${cegidAno.length ? Math.min(...cegidAno.map((a) => a.ano)) : "—"} a ${cegidAno.length ? Math.max(...cegidAno.map((a) => a.ano)) : "—"}` : ""} · integração antiga
+              </p>
+              <p className="mt-4 font-heading text-3xl font-bold">{euros(totalCegid)}</p>
+              <p className="text-sm text-muted-foreground">{contagem(faturasCegid)} faturas emitidas no Cegid</p>
+              {cegidCopias && (
+                <>
+                  <div className="mt-5 flex items-baseline justify-between text-sm">
+                    <span>PDFs guardados</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {contagem(cegidCopias.guardados)} de {contagem(cegidCopias.total)}
+                    </span>
+                  </div>
+                  <div className="mt-2 h-2 w-full rounded bg-muted">
+                    <div className="h-2 rounded bg-primary" style={{ width: `${cegidCopias.total ? (cegidCopias.guardados / cegidCopias.total) * 100 : 0}%` }} />
+                  </div>
+                  {cegidCopias.comErro > 0 && <p className="mt-2 text-sm text-destructive">{contagem(cegidCopias.comErro)} com erro ao descarregar</p>}
+                </>
+              )}
+            </Link>
+          )}
+        </div>
+      )}
+
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <GraficoBarras
           titulo="Clientes com maior faturação"
           subtitulo={nomeMesTitulo(mes)}
-          pontos={topClientes.map((t) => ({
-            rotulo: `${t.user_id} ${nomes.get(t.user_id.toString()) ?? ""}`.trim(),
-            valor: t.valor ?? 0,
+          pontos={top.map(([id, t]) => ({
+            rotulo: `${id} ${nomes.get(id) ?? ""}`.trim(),
+            valor: t.valor,
             detalhe: `${t.n} fatura(s)`,
           }))}
           formato="euro"
@@ -158,7 +283,7 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
         <GraficoBarras
           titulo="Faturado por rubrica"
           subtitulo={nomeMesTitulo(mes)}
-          pontos={rubricas.map((r) => ({ rotulo: r.rubrica ?? "—", valor: r.valor ?? 0, detalhe: `${contagem(r.transacoes ?? 0)} transações` }))}
+          pontos={topRubricas.map(([rubrica, r]) => ({ rotulo: rubrica, valor: r.valor, detalhe: `${contagem(r.transacoes)} transações` }))}
           formato="euro"
           rotuloValor="Faturado"
           vazio="Sem rubricas registadas neste mês."
@@ -200,6 +325,7 @@ export default async function PaginaResumo({ searchParams }: { searchParams: Pro
           formato="contagem"
           rotuloValor="Clientes"
         />
+      </div>
       </div>
     </div>
   );

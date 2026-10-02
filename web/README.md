@@ -108,6 +108,15 @@ Outras ferramentas na Faturação:
 - **Notas de crédito** e **Diagnóstico ZSGO** (resposta em bruto do ZSGO,
   para ajustar a leitura ao formato real).
 
+## Menu
+
+Como no ZSGO: separadores em cima (Dashboard, Entidades, Produtos, Vendas,
+Tesouraria, Relatórios, Configuração) e, à esquerda, os grupos do separador
+aberto ("Resumo de…" / "Novo…"). Está em `apps/web/src/lib/menu.ts`; cada
+entrada só aparece a quem tem permissão e, nas do ZSGO, se a operação existir
+na API. O Dashboard junta o histórico do Cegid aos totais e gráficos
+(por mês, por ano desde 2019, top clientes e rubricas).
+
 ## Histórico Cegid
 
 O menu **Histórico Cegid** mostra as faturas da integração antiga com o

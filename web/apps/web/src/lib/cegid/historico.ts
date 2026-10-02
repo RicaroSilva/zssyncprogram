@@ -142,3 +142,39 @@ export async function faturadoCegidPorMes(deAnoMes: number, ateAnoMes: number) {
     WHERE (i.year * 12 + i.month) BETWEEN ${deAnoMes} AND ${ateAnoMes}
     GROUP BY 1, 2`;
 }
+
+/** Total faturado no Cegid por ano (todo o histórico). */
+export async function faturadoCegidPorAno() {
+  return prisma.$queryRaw<Array<{ ano: number; valor: number | null; n: bigint }>>`
+    SELECT i.year::int AS ano, SUM(l.total_amount_with_taxes)::float AS valor, COUNT(DISTINCT i.mpinv_id) AS n
+    FROM lp_cloudware_monthly_processing_invoices i
+    JOIN lp_cloudware_monthly_processing_invoice_lines l ON l.mpinv_id = i.mpinv_id
+    GROUP BY 1`;
+}
+
+/** Clientes com mais faturação no Cegid num mês. */
+export async function topClientesCegid(ano: number, mes: number) {
+  return prisma.$queryRaw<Array<{ user_id: bigint; valor: number; n: bigint }>>`
+    SELECT i.user_id, SUM(l.total_amount_with_taxes)::float AS valor, COUNT(DISTINCT i.mpinv_id) AS n
+    FROM lp_cloudware_monthly_processing_invoices i
+    JOIN lp_cloudware_monthly_processing_invoice_lines l ON l.mpinv_id = i.mpinv_id
+    WHERE i.year = ${ano}::smallint AND i.month = ${mes}::smallint
+    GROUP BY 1 ORDER BY 2 DESC NULLS LAST LIMIT 10`;
+}
+
+/** Faturado por rubrica no Cegid num mês (com a descrição da rubrica). */
+export async function rubricasCegid(ano: number, mes: number) {
+  return prisma.$queryRaw<Array<{ rubrica: string; valor: number; transacoes: number }>>`
+    SELECT COALESCE(
+             (SELECT rm.rubric_description FROM lp_cloudware_rubrics_mappings rm WHERE rm.transaction_internal_name = t.rubric_code LIMIT 1),
+             (SELECT rm.rubric_description FROM lp_cloudware_rubrics_mappings rm WHERE rm.cw_service_code = t.rubric_code LIMIT 1),
+             t.rubric_code) AS rubrica,
+           t.valor, t.transacoes
+    FROM (
+      SELECT l.rubric_code, SUM(l.total_amount_with_taxes)::float AS valor, SUM(l.total_transactions)::float AS transacoes
+      FROM lp_cloudware_monthly_processing_invoices i
+      JOIN lp_cloudware_monthly_processing_invoice_lines l ON l.mpinv_id = i.mpinv_id
+      WHERE i.year = ${ano}::smallint AND i.month = ${mes}::smallint
+      GROUP BY 1
+    ) t`;
+}

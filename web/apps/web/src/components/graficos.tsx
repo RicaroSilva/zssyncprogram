@@ -95,6 +95,7 @@ export function GraficoColunas({
   formato,
   formatoEixo = formato,
   rotuloValor = "Valor",
+  largura = 1100,
 }: {
   titulo: string;
   subtitulo?: string;
@@ -102,14 +103,15 @@ export function GraficoColunas({
   formato: Formato;
   formatoEixo?: Formato;
   rotuloValor?: string;
+  /** Largura do desenho: próxima da largura real no ecrã, para o texto não ficar minúsculo. */
+  largura?: number;
 }) {
   const formatar = formatador(formato);
   const formatarEixo = formatador(formatoEixo);
   const id = useId();
   const [ativo, setAtivo] = useState<number | null>(null);
   // viewBox próximo da largura real, para o texto não crescer com o ecrã.
-  const largura = 1100;
-  const altura = 260;
+  const altura = largura < 800 ? 300 : 260;
   const margem = { cima: 12, baixo: 30, esquerda: 64, direita: 8 };
   const max = arredondarEscala(Math.max(0, ...pontos.map((p) => p.valor)));
   const banda = (largura - margem.esquerda - margem.direita) / Math.max(1, pontos.length);
