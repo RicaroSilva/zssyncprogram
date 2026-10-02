@@ -29,6 +29,8 @@ export interface EstadoDownload {
   limiteAutomatico: number;
   segundosPorDocumento: number;
   esperas429: number;
+  /** Pedidos ao Cegid nesta execução, por tipo, e quantos levaram 429. */
+  pedidos: Record<string, { n: number; travoes: number }>;
   /** Resultado da última pré-análise do S3. */
   analise: ResultadoAnalise | null;
 }
@@ -63,6 +65,7 @@ const estado: EstadoDownload = (g.__downloadCegid ??= {
   limiteAutomatico: 0,
   segundosPorDocumento: 0,
   esperas429: 0,
+  pedidos: {},
   analise: null,
 });
 
@@ -106,6 +109,7 @@ export function iniciarDownload(iniciadoPor: string, repetirErros: boolean, soAn
     limiteAutomatico: 0,
     segundosPorDocumento: 0,
     esperas429: 0,
+    pedidos: {},
     ultimaMensagem: `Pré-análise: a ler os ficheiros que já estão em ${armazenamento.descricao}…`,
   });
   const tarefa = async () => {
@@ -158,7 +162,20 @@ function faturaSemTravao() {
 }
 const limiteAtual = () => Math.min(lerParalelos(), ajuste.limite || lerParalelos());
 
+/**
+ * Dividir o download por vários PCs (cada um com a sua ligação à internet,
+ * se o Cegid limitar por IP): cegid.download.dividir_por=2 e
+ * cegid.download.parte=1 num PC, parte=2 no outro. Cada um só trata as
+ * faturas cujo nº interno dá esse resto — nunca as mesmas.
+ */
+export function divisaoDownload(): { de: number; parte: number } {
+  const de = Math.max(1, Math.min(10, cfgInt("cegid.download.dividir_por", 1)));
+  const parte = Math.max(1, Math.min(de, cfgInt("cegid.download.parte", 1)));
+  return { de, parte };
+}
+
 async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
+  const divisao = divisaoDownload();
   const pausa = Math.max(0, cfgInt("cegid.download.pausa_ms", 0));
   let errosSeguidos = 0;
   let paradoPorErros = false;
@@ -175,6 +192,7 @@ async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
         LEFT JOIN zsgo_web_cegid_documento d ON d.mpinv_id = i.mpinv_id
         WHERE i.mpinv_id > ${ultimoId} AND i.document_cw_url IS NOT NULL AND i.document_cw_url <> ''
           AND (d.mpinv_id IS NULL OR (${repetirErros} AND d.estado = 'ERRO'))
+          AND i.mpinv_id % ${divisao.de} = ${divisao.parte - 1}
         ORDER BY i.mpinv_id LIMIT 200`;
       if (lote.length === 0) acabou = true;
       else {
@@ -429,11 +447,47 @@ const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const gr = globalThis as unknown as { __travaoCegid?: { ate: number } };
 const travao = (gr.__travaoCegid ??= { ate: 0 });
 
+function tipoPedido(u: string): string {
+  if (u.includes("/public-file/")) return "ficheiro";
+  if (/\/public_links\/link\/eyJ/.test(u)) return "gerar documento";
+  if (u.includes("/rus/public-rus/public_links/link/")) return "página";
+  if (u.includes("/public_links/link/")) return "link guardado";
+  return "outro";
+}
+
+function contarPedido(tipo: string, travao: boolean) {
+  const c = (estado.pedidos[tipo] ??= { n: 0, travoes: 0 });
+  c.n++;
+  if (travao) c.travoes++;
+}
+
+/**
+ * O link guardado (…/public_links/link/TOKEN) redireciona sempre para o mesmo
+ * sítio (…/rus/public-rus/public_links/link/TOKEN, às vezes noutro servidor).
+ * Aprende-se o destino no primeiro redirecionamento e as faturas seguintes vão
+ * diretamente para lá — menos um pedido ao Cegid por fatura.
+ */
+const atalhos = new Map<string, string>();
+const prefixoLink = (u: string) => u.match(/^(https?:\/\/[^/]+\/(?:rus\/public-rus\/)?public_links\/link\/)([^/?#]+)/);
+function aplicarAtalho(u: string): string {
+  const m = prefixoLink(u);
+  const destino = m && atalhos.get(m[1]!);
+  return destino ? `${destino}${m![2]}` : u;
+}
+function aprenderAtalho(origem: string, final: string) {
+  const a = prefixoLink(origem);
+  const b = prefixoLink(final);
+  if (a && b && a[2] === b[2] && a[1] !== b[1]) atalhos.set(a[1]!, b[1]!);
+}
+
 async function pedir(u: string, passos?: string[]): Promise<Response> {
+  const tipo = tipoPedido(u);
   for (let tentativa = 1; ; tentativa++) {
     const falta = travao.ate - Date.now();
     if (falta > 0) await espera(falta);
     const r = await fetch(u, { redirect: "follow", signal: AbortSignal.timeout(90_000), headers: { "user-agent": "Mozilla/5.0 (faturacao-web; copia de documentos)" } });
+    if (r.redirected || (r.url && r.url !== u)) contarPedido("redirecionamento", false);
+    contarPedido(tipo, r.status === 429);
     if (r.status !== 429 || tentativa >= 4) return r;
     const segundos = Math.min(120, Number(r.headers.get("retry-after")) || 10 * tentativa);
     passos?.push(`429 (demasiados pedidos) — espero ${segundos} s e tento outra vez`);
@@ -518,7 +572,8 @@ async function seguirEnderecosCegid(texto: string, base: string, passos: string[
 const ehPdf = (d: Buffer) => d.subarray(0, 5).toString("latin1") === "%PDF-";
 
 async function obterDocumento(url: string, passos?: string[], guardarHtml?: (html: string, urlFinal: string) => void, comPalpites = true): Promise<{ dados: Buffer; tipo: string }> {
-  let alvo = linkDireto(url);
+  const original = linkDireto(url);
+  let alvo = aplicarAtalho(original);
   const visitados = new Set<string>();
   // Até 3 saltos: o link público do Cegid pode redirecionar para o Google, ou
   // devolver uma página com o PDF lá dentro (iframe/embed/ligação).
@@ -528,6 +583,13 @@ async function obterDocumento(url: string, passos?: string[], guardarHtml?: (htm
     const dados = Buffer.from(await r.arrayBuffer());
     const tipo = (r.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
     const urlFinal = r.url || alvo;
+    if (urlFinal !== alvo) aprenderAtalho(alvo, urlFinal);
+    if (alvo !== original && salto === 0 && !r.ok) {
+      // O atalho não serve para este token: volta ao link guardado.
+      passos?.push(`atalho ${alvo.slice(0, 90)}… → ${r.status}; tento o link guardado`);
+      alvo = original;
+      continue;
+    }
     passos?.push(`${alvo.slice(0, 120)} → ${r.status} ${tipo || "?"} (${dados.length} bytes)${urlFinal !== alvo ? ` · redirecionou para ${urlFinal.slice(0, 120)}` : ""}`);
     if (!r.ok) throw new Error(`O link respondeu ${r.status} ${r.statusText}`);
     if (ehPdf(dados)) return { dados, tipo: "application/pdf" };

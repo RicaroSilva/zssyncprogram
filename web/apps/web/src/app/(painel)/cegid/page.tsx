@@ -9,7 +9,7 @@ import { Paginacao } from "@/components/paginacao";
 import { Notice } from "@/components/notice";
 import { cn } from "@/lib/utils";
 import { listarFaturasCegid, temHistoricoCegid, ultimoMesCegid, type FiltroCopia } from "@/lib/cegid/historico";
-import { contagemDocumentos, estadoDownload } from "@/lib/cegid/descarregar";
+import { contagemDocumentos, divisaoDownload, estadoDownload } from "@/lib/cegid/descarregar";
 import { armazenamentoConfigurado } from "@/lib/cegid/armazenamento";
 import { configExiste } from "@/lib/config";
 import { PainelDownload } from "./painel-download";
@@ -75,7 +75,7 @@ export default async function PaginaCegid({ searchParams }: { searchParams: Prom
       </p>
 
       <div className="mt-6">
-        <PainelDownload inicial={{ estado: estadoDownload(), contagem }} podeIniciar={pode(sessao, "FATURACAO", "criar")} destino={destino} />
+        <PainelDownload inicial={{ estado: estadoDownload(), contagem, divisao: divisaoDownload() }} podeIniciar={pode(sessao, "FATURACAO", "criar")} destino={destino} />
       </div>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">

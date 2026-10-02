@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { exigirPermissao } from "@/lib/exigir-permissao";
 import { registarAuditoria } from "@/lib/auditoria";
 import { obterIpCliente } from "@/lib/rede-confianca";
-import { contagemDocumentos, estadoDownload, iniciarDownload, pararDownload, testarDocumento, type EstadoDownload } from "@/lib/cegid/descarregar";
+import { contagemDocumentos, divisaoDownload, estadoDownload, iniciarDownload, pararDownload, testarDocumento, type EstadoDownload } from "@/lib/cegid/descarregar";
 
 export async function iniciarDownloadAction(repetirErros: boolean, soAnalisar = false): Promise<{ ok: boolean; erro?: string }> {
   const sessao = await exigirPermissao("FATURACAO", "criar");
@@ -28,9 +28,9 @@ export async function pararDownloadAction(): Promise<void> {
   pararDownload();
 }
 
-export async function progressoDownloadAction(): Promise<{ estado: EstadoDownload; contagem: Awaited<ReturnType<typeof contagemDocumentos>> }> {
+export async function progressoDownloadAction(): Promise<{ estado: EstadoDownload; contagem: Awaited<ReturnType<typeof contagemDocumentos>>; divisao: { de: number; parte: number } }> {
   await exigirPermissao("FATURACAO", "consultar");
-  return { estado: estadoDownload(), contagem: await contagemDocumentos() };
+  return { estado: estadoDownload(), contagem: await contagemDocumentos(), divisao: divisaoDownload() };
 }
 
 /** Experimenta o link da fatura mais recente (ou de uma em particular), sem guardar nada. */

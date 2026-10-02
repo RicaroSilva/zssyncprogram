@@ -401,6 +401,10 @@ creditnote.query=\
 # pedidos), todos esperam e o limite desce sozinho (3/4); sem 429 volta a
 # subir aos poucos até este máximo.
 #cegid.download.paralelos=12
+# Dividir o download por vários PCs (cada um com a sua ligação à internet, se
+# o Cegid limitar por IP): num PC parte=1, no outro parte=2 (nunca repetem).
+#cegid.download.dividir_por=2
+#cegid.download.parte=1
 #cegid.download.pausa_ms=0
 # Quando o link do Cegid abre a página do visualizador (e não o PDF), o
 # endereço do PDF. {url} = endereço final do link, {token} = último bocado.

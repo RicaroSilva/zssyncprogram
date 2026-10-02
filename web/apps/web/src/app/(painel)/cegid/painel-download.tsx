@@ -23,7 +23,7 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
   const [idTeste, setIdTeste] = useState("");
   const [teste, setTeste] = useState<Awaited<ReturnType<typeof testarDocumentoAction>> | null>(null);
   const [pendente, iniciar] = useTransition();
-  const { estado, contagem } = p;
+  const { estado, contagem, divisao } = p;
 
   useEffect(() => {
     if (!estado.aCorrer) return;
@@ -129,6 +129,32 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
         )}
       </div>
 
+      {Object.keys(estado.pedidos ?? {}).length > 0 && estado.feitosNestaExecucao + estado.errosNestaExecucao > 0 && (
+        <details className="mt-3 text-sm">
+          <summary className="cursor-pointer text-muted-foreground">
+            Pedidos ao Cegid nesta execução:{" "}
+            <b className="font-semibold text-foreground">
+              {(Object.values(estado.pedidos).reduce((a, c) => a + c.n, 0) / (estado.feitosNestaExecucao + estado.errosNestaExecucao)).toFixed(1)} por fatura
+            </b>
+          </summary>
+          <table className="mt-2 text-sm">
+            <tbody>
+              {Object.entries(estado.pedidos).map(([tipo, c]) => (
+                <tr key={tipo}>
+                  <td className="py-0.5 pr-6">{tipo}</td>
+                  <td className="py-0.5 pr-6 text-right tabular-nums">{n(c.n)}</td>
+                  <td className="py-0.5 text-right tabular-nums text-muted-foreground">{c.travoes ? `${n(c.travoes)} com 429` : ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
+      {divisao.de > 1 && (
+        <p className="mt-3 text-sm">
+          Este PC trata a <b className="font-semibold">parte {divisao.parte} de {divisao.de}</b> das faturas (o progresso acima conta todas as partes).
+        </p>
+      )}
       {(estado.aCorrer || estado.ultimaMensagem) && (
         <p className="mt-3 text-sm">
           {estado.aCorrer && <span className="mr-2 inline-block h-2 w-2 animate-pulse rounded-full bg-primary" aria-hidden />}
