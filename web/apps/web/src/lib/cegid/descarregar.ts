@@ -140,17 +140,29 @@ async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
   }
 }
 
-/** Nome do ficheiro, direto no bucket (sem pastas de datas): 1006-FT-2025-113-13.pdf */
-function chaveDe(doc: Pendente, extensao: string): string {
-  const numero = (doc.document_cw_number ?? "sem-numero").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
-  return `${prefixoChaves()}${doc.user_id}-${numero}-${doc.mpinv_id}.${extensao}`;
+/** Nomes já atribuídos nesta execução (os downloads correm em paralelo). */
+const gn = globalThis as unknown as { __nomesCegid?: Map<string, number> };
+const nomesEmUso = (gn.__nomesCegid ??= new Map<string, number>());
+
+/** Nome do ficheiro: só o nº da fatura, direto no bucket ("FT 2025/113" → FT-2025-113.pdf). */
+async function chaveDe(doc: Pendente, extensao: string): Promise<string> {
+  const numero = (doc.document_cw_number ?? "").replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+  if (!numero) return `${prefixoChaves()}sem-numero-${doc.mpinv_id}.${extensao}`;
+  const chave = `${prefixoChaves()}${numero}.${extensao}`;
+  // Se outro documento já ficou com este nome, não o substituir.
+  const [ocupada] = await prisma.$queryRaw<Array<{ mpinv_id: number }>>`
+    SELECT mpinv_id FROM zsgo_web_cegid_documento WHERE chave = ${chave} AND mpinv_id <> ${doc.mpinv_id} LIMIT 1`;
+  const dono = nomesEmUso.get(chave);
+  if (ocupada || (dono !== undefined && dono !== doc.mpinv_id)) return `${prefixoChaves()}${numero}-${doc.mpinv_id}.${extensao}`;
+  nomesEmUso.set(chave, doc.mpinv_id);
+  return chave;
 }
 
 async function descarregarUm(armazenamento: Armazenamento, doc: Pendente): Promise<boolean> {
   try {
     const { dados, tipo } = await obterComAlternativas(doc.document_cw_url);
     const extensao = tipo.includes("pdf") ? "pdf" : tipo.includes("xml") ? "xml" : "bin";
-    const chave = chaveDe(doc, extensao);
+    const chave = await chaveDe(doc, extensao);
     await armazenamento.guardar(chave, dados, tipo);
     const hash = createHash("sha256").update(dados).digest("hex");
     await prisma.$executeRaw`
