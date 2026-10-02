@@ -25,6 +25,8 @@ export interface EstadoDownload {
   ultimaMensagem: string;
   /** Em curso: quantos ao mesmo tempo, segundos por documento (média recente) e travões 429 do Cegid. */
   paralelosAtuais: number;
+  /** Limite automático (desce quando o Cegid responde 429, sobe aos poucos sem 429). */
+  limiteAutomatico: number;
   segundosPorDocumento: number;
   esperas429: number;
   /** Resultado da última pré-análise do S3. */
@@ -58,6 +60,7 @@ const estado: EstadoDownload = (g.__downloadCegid ??= {
   errosNestaExecucao: 0,
   ultimaMensagem: "",
   paralelosAtuais: 0,
+  limiteAutomatico: 0,
   segundosPorDocumento: 0,
   esperas429: 0,
   analise: null,
@@ -100,6 +103,7 @@ export function iniciarDownload(iniciadoPor: string, repetirErros: boolean, soAn
     feitosNestaExecucao: 0,
     errosNestaExecucao: 0,
     paralelosAtuais: 0,
+    limiteAutomatico: 0,
     segundosPorDocumento: 0,
     esperas429: 0,
     ultimaMensagem: `Pré-análise: a ler os ficheiros que já estão em ${armazenamento.descricao}…`,
@@ -132,6 +136,28 @@ interface Pendente {
 
 const lerParalelos = () => Math.max(1, Math.min(40, cfgInt("cegid.download.paralelos", 12)));
 
+/**
+ * Ajuste automático: um 429 do Cegid baixa o limite para 3/4 (mínimo 2) —
+ * no máximo uma vez a cada 15 s, porque vários pedidos recebem o mesmo 429
+ * ao mesmo tempo; cada 40 faturas seguidas sem 429 sobem-no 1, até ao valor
+ * do config.properties.
+ */
+const ajuste = { limite: 0, ultimoCorte: 0, semTravao: 0 };
+function travaoRecebido() {
+  if (Date.now() - ajuste.ultimoCorte < 15_000) return;
+  ajuste.ultimoCorte = Date.now();
+  ajuste.semTravao = 0;
+  ajuste.limite = Math.max(2, Math.floor((ajuste.limite || lerParalelos()) * 0.75));
+  estado.limiteAutomatico = ajuste.limite;
+}
+function faturaSemTravao() {
+  if (++ajuste.semTravao < 40) return;
+  ajuste.semTravao = 0;
+  ajuste.limite = Math.min(lerParalelos(), (ajuste.limite || lerParalelos()) + 1);
+  estado.limiteAutomatico = ajuste.limite;
+}
+const limiteAtual = () => Math.min(lerParalelos(), ajuste.limite || lerParalelos());
+
 async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
   const pausa = Math.max(0, cfgInt("cegid.download.pausa_ms", 0));
   let errosSeguidos = 0;
@@ -159,7 +185,9 @@ async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
     })().finally(() => (aEncher = null)));
 
   let ativos = 0;
-  let alvo = lerParalelos();
+  ajuste.limite = lerParalelos();
+  estado.limiteAutomatico = ajuste.limite;
+  let alvo = limiteAtual();
   let ultimoAjuste = Date.now();
   const trabalhadores: Promise<void>[] = [];
   const trabalhador = async () => {
@@ -176,7 +204,10 @@ async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
         }
         const doc = fila.shift()!;
         const inicio = Date.now();
+        const antes = estado.esperas429;
         const ok = await descarregarUm(armazenamento, doc);
+        if (estado.esperas429 === antes) faturaSemTravao();
+        alvo = limiteAtual();
         const seg = (Date.now() - inicio) / 1000;
         estado.segundosPorDocumento = estado.segundosPorDocumento ? estado.segundosPorDocumento * 0.95 + seg * 0.05 : seg;
         errosSeguidos = ok ? 0 : errosSeguidos + 1;
@@ -196,7 +227,7 @@ async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
   // Lê de novo cegid.download.paralelos a cada lote: pode mudar-se sem parar o download.
   function ajustar() {
     ultimoAjuste = Date.now();
-    alvo = lerParalelos();
+    alvo = limiteAtual();
     while (ativos < alvo && !estado.pararPedido && !(acabou && fila.length === 0)) trabalhadores.push(trabalhador());
     estado.paralelosAtuais = Math.min(ativos, alvo);
   }
@@ -408,6 +439,7 @@ async function pedir(u: string, passos?: string[]): Promise<Response> {
     passos?.push(`429 (demasiados pedidos) — espero ${segundos} s e tento outra vez`);
     travao.ate = Math.max(travao.ate, Date.now() + segundos * 1000);
     estado.esperas429++;
+    travaoRecebido();
     await r.arrayBuffer().catch(() => {});
     await espera(segundos * 1000);
   }
