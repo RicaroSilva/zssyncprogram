@@ -112,9 +112,14 @@ export function iniciarDownload(iniciadoPor: string, repetirErros: boolean, soAn
     pedidos: {},
     ultimaMensagem: `Pré-análise: a ler os ficheiros que já estão em ${armazenamento.descricao}…`,
   });
+  // A pré-análise (ler a lista do S3) só é precisa uma vez: o que se descarrega
+  // depois fica registado na base de dados. "Continuar" salta-a se já foi feita
+  // nas últimas 12 horas; o botão "Pré-análise do S3" fá-la sempre.
+  const recente = !!estado.analise && Date.now() - new Date(estado.analise.em).getTime() < 12 * 3600_000;
+  if (recente && !soAnalisar) estado.ultimaMensagem = "A começar a descarregar (pré-análise já feita há pouco)…";
   const tarefa = async () => {
     try {
-      await analisar(armazenamento);
+      if (soAnalisar || !recente) await analisar(armazenamento);
     } catch (e) {
       estado.ultimaMensagem = `A pré-análise falhou: ${descreverErro(e)}`;
       return;
