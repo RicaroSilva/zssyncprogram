@@ -40,7 +40,14 @@ export default async function PaginaListaZsgo({ params, searchParams }: { params
         <p className="mt-3 max-w-3xl text-lg text-muted-foreground">{recurso.descricao}</p>
         {podeCriar && ops.criar?.corpo ? (
           <div className="mt-8 rounded-card border border-border bg-surface p-6">
-            <NovoSemLista slug={slug} esquema={ops.criar.corpo} opcoes={opcoes} nomeChave={recurso.parametro ?? "id"} />
+            <NovoSemLista
+              slug={slug}
+              esquema={ops.criar.corpo}
+              opcoes={opcoes}
+              nomeChave={recurso.parametro ?? "id"}
+              // SAF-T: por omissão o ano anterior completo, com a morada da empresa.
+              inicial={slug === "saft" ? { export_type: "annual", year: String(new Date().getFullYear() - 1), use_company_address: true } : undefined}
+            />
           </div>
         ) : (
           <Notice className="mt-6">O seu perfil não pode criar nesta área.</Notice>

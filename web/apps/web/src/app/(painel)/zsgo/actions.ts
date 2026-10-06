@@ -66,7 +66,19 @@ export async function operacaoZsgoAction(slug: string, tipo: TipoOperacao, chave
         : descreverErro(e),
     };
   }
-  if (r.status < 200 || r.status >= 300) return { ok: false, erro: mensagemErro(r.status, r.json, r.texto) };
+  if (r.status < 200 || r.status >= 300) {
+    const enviado = op.corpo ? `\n\nPedido enviado: ${op.metodo} ${op.caminho}\n${JSON.stringify(corpo ?? {}, null, 2)}` : `\n\nPedido enviado: ${op.metodo} ${op.caminho}`;
+    const erro = mensagemErro(r.status, r.json, r.texto) + enviado;
+    await registarAuditoria({
+      utilizadorId: sessao.utilizadorId,
+      acao: `zsgo_${tipo}_recusado`,
+      entidade: `ZSGO ${recurso.caminho}`,
+      entidadeId: chave,
+      depois: { status: r.status, resposta: r.json ?? r.texto, corpo },
+      ip: obterIpCliente(await headers()),
+    });
+    return { ok: false, erro };
+  }
   const dados = normalizarItem(r.json);
   const novaChave = tipo === "criar" ? (chaveDoItem(recurso, dados) ?? (typeof r.json === "string" ? r.json : undefined)) : (chave ?? undefined);
   await registarAuditoria({

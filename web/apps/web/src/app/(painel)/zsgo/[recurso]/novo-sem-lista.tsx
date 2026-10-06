@@ -6,12 +6,13 @@ import type { Esquema } from "@/lib/zsgo/especificacao";
 import { operacaoZsgoAction } from "../actions";
 
 /** Áreas sem lista (ex.: SAF-T): o formulário de criar e, depois, o detalhe do pedido. */
-export function NovoSemLista({ slug, esquema, opcoes, nomeChave }: { slug: string; esquema: Esquema; opcoes: Record<string, OpcaoSeletor[]>; nomeChave: string }) {
+export function NovoSemLista({ slug, esquema, opcoes, nomeChave, inicial }: { slug: string; esquema: Esquema; opcoes: Record<string, OpcaoSeletor[]>; nomeChave: string; inicial?: Record<string, unknown> }) {
   const router = useRouter();
   return (
     <FormularioZsgo
       esquema={esquema}
       opcoes={opcoes}
+      inicial={inicial}
       textoBotao="Pedir ao ZSGO"
       aoEnviar={async (corpo) => {
         const r = await operacaoZsgoAction(slug, "criar", null, corpo);

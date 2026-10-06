@@ -89,8 +89,7 @@ public class ZsgoApiClient {
 
       int var5 = var2.statusCode();
       if (var5 != 200 && var5 != 201) {
-         String var9 = unescapeJson(firstMatch(MESSAGE_PATTERN, (String)var2.body()));
-         String var7 = var9 != null ? var9 : (String)var2.body();
+         String var7 = erroCompleto((String)var2.body());
          throw new ZsgoApiException("POST /clients devolveu " + var5 + ": " + var7 + " | Payload enviado: " + var3, var5);
       } else {
          String var6 = firstMatch(CODE_PATTERN, (String)var2.body());
@@ -118,8 +117,7 @@ public class ZsgoApiClient {
          String var9 = firstMatch(CODE_PATTERN, (String)var5.body());
          return new ZsgoApiClient.ClientResult(var9 != null ? var9 : var2, (String)var5.body());
       } else {
-         String var7 = unescapeJson(firstMatch(MESSAGE_PATTERN, (String)var5.body()));
-         String var8 = var7 != null ? var7 : (String)var5.body();
+         String var8 = erroCompleto((String)var5.body());
          throw new ZsgoApiException("PATCH /clients/" + var2 + " devolveu " + var6 + ": " + var8 + " | Payload enviado: " + var3, var6);
       }
    }
@@ -152,9 +150,8 @@ public class ZsgoApiClient {
 
          return new ZsgoApiClient.ResultadoTesteLigacao(var8, var1.headers().map());
       } else {
-         String var4 = unescapeJson(firstMatch(MESSAGE_PATTERN, (String)var1.body()));
          String var5 = var3 != 401 && var3 != 403 ? "" : " (token inválido, expirado ou sem permissões?)";
-         throw new ZsgoApiException("GET /countries devolveu " + var3 + (var4 != null ? ": " + var4 : "") + var5, var3);
+         throw new ZsgoApiException("GET /countries devolveu " + var3 + var5 + ": " + erroCompleto((String)var1.body()), var3);
       }
    }
 
@@ -174,9 +171,8 @@ public class ZsgoApiClient {
          throw new ZsgoResultadoIncertoException("POST /sales devolveu " + var4 + " (servidor sem resposta) — a fatura PODE ter sido criada. Não foi reenviada.", null);
       }
       if (var4 != 200 && var4 != 201) {
-         String var8 = unescapeJson(firstMatch(MESSAGE_PATTERN, (String)var3.body()));
-         String var9 = var8 != null ? var8 : (String)var3.body();
-         throw new ZsgoApiException("POST /sales devolveu " + var4 + ": " + var9, var4);
+         String var9 = erroCompleto((String)var3.body());
+         throw new ZsgoApiException("POST /sales devolveu " + var4 + ": " + var9 + " | Payload enviado: " + var1, var4);
       } else {
          String var5 = firstMatch(ID_PATTERN, (String)var3.body());
          if (var5 == null) {
@@ -201,8 +197,7 @@ public class ZsgoApiClient {
       HttpResponse<String> resposta = this.sendComRetry429(pedido);
       int codigo = resposta.statusCode();
       if (codigo != 200) {
-         String msg = unescapeJson(firstMatch(MESSAGE_PATTERN, resposta.body()));
-         throw new ZsgoApiException("GET /sales/" + id + " devolveu " + codigo + ": " + (msg != null ? msg : resposta.body()), codigo);
+         throw new ZsgoApiException("GET /sales/" + id + " devolveu " + codigo + ": " + erroCompleto(resposta.body()), codigo);
       }
       try {
          return ZsgoDocumento.ler(resposta.body());
@@ -249,8 +244,7 @@ public class ZsgoApiClient {
          .build();
       HttpResponse<String> resposta = this.sendComRetry429(pedido);
       if (resposta.statusCode() != 200) {
-         String msg = unescapeJson(firstMatch(MESSAGE_PATTERN, resposta.body()));
-         throw new ZsgoApiException("GET /sales?search devolveu " + resposta.statusCode() + ": " + (msg != null ? msg : resposta.body()), resposta.statusCode());
+         throw new ZsgoApiException("GET /sales?search devolveu " + resposta.statusCode() + ": " + erroCompleto(resposta.body()), resposta.statusCode());
       }
       try {
          return ZsgoDocumento.lerPagina(resposta.body());
@@ -462,6 +456,13 @@ public class ZsgoApiClient {
 
    private static boolean notBlank(String var0) {
       return var0 != null && !var0.isBlank();
+   }
+
+   /** A mensagem do ZSGO (se houver) e SEMPRE a resposta completa — o detalhe de cada campo vem em "errors". */
+   private static String erroCompleto(String corpo) {
+      String msg = unescapeJson(firstMatch(MESSAGE_PATTERN, corpo));
+      String completo = corpo == null || corpo.isBlank() ? "(resposta vazia)" : corpo;
+      return msg != null ? msg + " | Resposta completa do ZSGO: " + completo : completo;
    }
 
    private static String firstMatch(Pattern var0, String var1) {

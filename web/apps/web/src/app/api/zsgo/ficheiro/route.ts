@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   if (!op) return NextResponse.json({ erro: "Operação inexistente." }, { status: 404 });
   const r = await new ZsgoApi().ficheiro(preencherCaminho(op.caminho, { [recurso.parametro]: chave }));
   if (r.status !== 200) {
-    return new NextResponse(`O ZSGO respondeu ${r.status}: ${new TextDecoder().decode(r.bytes).slice(0, 500)}`, { status: 502, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    return new NextResponse(`O ZSGO respondeu ${r.status}: ${new TextDecoder().decode(r.bytes)}`, { status: 502, headers: { "Content-Type": "text/plain; charset=utf-8" } });
   }
   const extensao = tipo === "xml" ? "xml" : tipo === "pdf" ? "pdf" : r.tipo.includes("zip") ? "zip" : "xml";
   const nome = r.nome ?? `${recurso.slug}-${chave}.${extensao}`;

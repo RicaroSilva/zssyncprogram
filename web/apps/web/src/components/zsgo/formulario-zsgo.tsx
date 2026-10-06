@@ -420,7 +420,7 @@ export function FormularioZsgo({
   return (
     <form onSubmit={enviar} className="space-y-5">
       <Campos esquema={esquema} valor={valor} caminho={[]} opcoes={opcoes} alterar={alterar} nivel={0} />
-      {erro && <p className="whitespace-pre-line rounded-lg border border-destructive-40 bg-destructive-10 p-3 text-sm text-destructive">{erro}</p>}
+      {erro && <p className="whitespace-pre-wrap break-words rounded-lg border border-destructive-40 bg-destructive-10 p-3 text-sm text-destructive">{erro}</p>}
       <div className="flex flex-wrap gap-3">
         <Button type="submit" disabled={aEnviar}>
           {aEnviar ? "A enviar ao ZSGO…" : textoBotao}

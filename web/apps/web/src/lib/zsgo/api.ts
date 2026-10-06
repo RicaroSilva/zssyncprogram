@@ -92,15 +92,23 @@ class LimitadorPedidos {
 
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function mensagemDaResposta(corpo: string): string {
+/** Tudo o que o ZSGO disse: a mensagem, o erro de cada campo e a resposta completa. */
+export function mensagemDaResposta(corpo: string): string {
+  const partes: string[] = [];
   try {
-    const j = JSON.parse(corpo) as { message?: unknown; error?: unknown };
-    if (typeof j.message === "string") return j.message;
-    if (typeof j.error === "string") return j.error;
+    const j = JSON.parse(corpo) as { message?: unknown; error?: unknown; errors?: unknown };
+    if (typeof j.message === "string") partes.push(j.message);
+    if (typeof j.error === "string") partes.push(j.error);
+    if (j.errors && typeof j.errors === "object") {
+      for (const [campo, msgs] of Object.entries(j.errors as Record<string, unknown>)) {
+        const texto = Array.isArray(msgs) ? msgs.map((m) => (typeof m === "string" ? m : JSON.stringify(m))).join(" ") : typeof msgs === "string" ? msgs : JSON.stringify(msgs);
+        partes.push(campo === "message" ? texto : `${campo}: ${texto}`);
+      }
+    }
+    return `${partes.join(" · ")}${partes.length ? "\n" : ""}Resposta completa do ZSGO: ${JSON.stringify(j, null, 2)}`;
   } catch {
-    // corpo não é JSON
+    return corpo || "(resposta vazia)";
   }
-  return corpo;
 }
 
 export class ZsgoApi {
@@ -216,7 +224,7 @@ export class ZsgoApi {
       throw new ZsgoResultadoIncerto(`POST /sales devolveu ${r.status} (servidor sem resposta) — a fatura PODE ter sido criada. Não foi reenviada.`, r.status);
     }
     if (r.status !== 200 && r.status !== 201) {
-      throw new ZsgoApiErro(`POST /sales devolveu ${r.status}: ${mensagemDaResposta(r.corpo)}`, r.status);
+      throw new ZsgoApiErro(`POST /sales devolveu ${r.status}: ${mensagemDaResposta(r.corpo)} | Payload enviado: ${payload}`, r.status);
     }
     // Igual ao Java (o que está a funcionar em produção): primeira
     // ocorrência de "id":"…" e de "pdf_url":"…" na resposta.

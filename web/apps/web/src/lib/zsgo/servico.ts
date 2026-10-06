@@ -30,20 +30,25 @@ export function normalizarItem(json: unknown): unknown {
   return Array.isArray(d) && d.length === 1 ? d[0] : d;
 }
 
-/** Mensagem de erro legível a partir da resposta do ZSGO. */
+/**
+ * Mensagem de erro a partir da resposta do ZSGO: o resumo (mensagem e erro de
+ * cada campo), uma dica para 401/403 e SEMPRE a resposta completa, para se
+ * perceber exatamente o que o ZSGO recusou.
+ */
 export function mensagemErro(status: number, json: unknown, texto: string): string {
   const j = json as { message?: unknown; errors?: unknown; error?: unknown } | null;
   const partes: string[] = [];
   if (j && typeof j.message === "string") partes.push(j.message);
   if (j && typeof j.error === "string") partes.push(j.error);
-  if (j && j.errors && typeof j.errors === "object" && Object.keys(j.errors).length > 0) {
+  if (j && j.errors && typeof j.errors === "object") {
     for (const [campo, msgs] of Object.entries(j.errors as Record<string, unknown>)) {
-      const texto = Array.isArray(msgs) ? msgs.join(" ") : String(msgs);
-      partes.push(campo === "message" ? texto : `${campo}: ${texto}`);
+      const t = Array.isArray(msgs) ? msgs.map((m) => (typeof m === "string" ? m : JSON.stringify(m))).join(" ") : typeof msgs === "string" ? msgs : JSON.stringify(msgs);
+      partes.push(campo === "message" ? t : `${campo}: ${t}`);
     }
   }
   const extra = status === 403 ? " (esta funcionalidade pode exigir a versão PRO do ZSGO)" : status === 401 ? " (token do ZSGO inválido)" : "";
-  return `O ZSGO respondeu ${status}${partes.length ? `: ${partes.join(" · ")}` : texto ? `: ${texto.slice(0, 500)}` : ""}${extra}`;
+  const completa = json !== null && json !== undefined ? JSON.stringify(json, null, 2) : texto || "(resposta vazia)";
+  return `O ZSGO respondeu ${status}${partes.length ? `: ${partes.join(" · ")}` : ""}${extra}\n\nResposta completa do ZSGO (HTTP ${status}):\n${completa}`;
 }
 
 /**
