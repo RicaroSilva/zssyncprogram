@@ -8,6 +8,7 @@ import { obterIpCliente } from "@/lib/rede-confianca";
 import { descreverErro } from "@/lib/erros";
 import { ZsgoResultadoIncerto } from "@/lib/zsgo/api";
 import { executar, mensagemErro, normalizarItem } from "@/lib/zsgo/servico";
+import { registarPedidoSaft } from "@/lib/zsgo/saft";
 import { chaveDoItem, operacoesDe, recursoPorSlug } from "@/lib/zsgo/recursos";
 import type { Acao } from "@/lib/auth";
 
@@ -66,6 +67,14 @@ export async function operacaoZsgoAction(slug: string, tipo: TipoOperacao, chave
         : descreverErro(e),
     };
   }
+  // SAF-T: já há uma exportação do mesmo período em curso — abre-se essa.
+  if (slug === "saft" && tipo === "criar" && r.status === 409) {
+    const existente = normalizarItem(r.json) as { process_id?: string } | null;
+    if (existente?.process_id) {
+      await registarPedidoSaft(existente.process_id, existente, corpo as Record<string, unknown>, sessao.email);
+      return { ok: true, chave: existente.process_id, dados: existente };
+    }
+  }
   if (r.status < 200 || r.status >= 300) {
     const enviado = op.corpo ? `\n\nPedido enviado: ${op.metodo} ${op.caminho}\n${JSON.stringify(corpo ?? {}, null, 2)}` : `\n\nPedido enviado: ${op.metodo} ${op.caminho}`;
     const erro = mensagemErro(r.status, r.json, r.texto) + enviado;
@@ -90,6 +99,7 @@ export async function operacaoZsgoAction(slug: string, tipo: TipoOperacao, chave
     ip: obterIpCliente(await headers()),
     historico: { utilizador: sessao.email, detalhe: `ZSGO: ${recurso.singular} ${novaChave ?? chave ?? ""} ${VERBO[tipo]} na página web.`.replace(/\s+/g, " ") },
   });
+  if (slug === "saft" && tipo === "criar" && novaChave) await registarPedidoSaft(novaChave, dados, corpo as Record<string, unknown>, sessao.email);
   revalidatePath(`/zsgo/${slug}`);
   return { ok: true, chave: novaChave, dados };
 }

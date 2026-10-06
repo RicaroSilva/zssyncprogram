@@ -152,7 +152,7 @@ export const RECURSOS_ZSGO: RecursoZsgo[] = [
   { slug: "linhas-preco", nome: "Linhas de preço", singular: "linha de preço", grupo: "Configuração", caminho: "/price-lines", descricao: "Linhas de preço (só consulta)." },
   { slug: "isencoes", nome: "Motivos de isenção", singular: "motivo de isenção", grupo: "Configuração", caminho: "/exemptions", descricao: "Códigos de isenção de IVA (só consulta)." },
   { slug: "paises", nome: "Países", singular: "país", grupo: "Configuração", caminho: "/countries", descricao: "Países (só consulta)." },
-  { slug: "saft", nome: "Exportação SAF-T", singular: "exportação SAF-T", grupo: "Exportações", caminho: "/saft-exports", parametro: "processId", descricao: "Gerar e descarregar o ficheiro SAF-T (anual, mensal ou por datas)." },
+  { slug: "saft", nome: "Exportação SAF-T", singular: "exportação SAF-T", grupo: "Exportações", caminho: "/saft-exports", parametro: "processId", caminhosChave: ["process_id", "processId", "id"], descricao: "Gerar e descarregar o ficheiro SAF-T (anual, mensal ou por datas)." },
 ];
 
 export const GRUPOS_ZSGO = ["Vendas", "Tesouraria", "Compras", "Artigos e stock", "Configuração", "Exportações"] as const;

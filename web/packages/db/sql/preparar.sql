@@ -222,3 +222,17 @@ CREATE TABLE IF NOT EXISTS zsgo_web_cegid_documento (
     atualizado_em  TIMESTAMP(3) NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS zsgo_web_cegid_documento_estado_idx ON zsgo_web_cegid_documento (estado);
+
+-- Pedidos de SAF-T feitos na página web (a API do ZSGO não tem lista de
+-- pedidos; guardam-se aqui para se ver o estado de cada um).
+CREATE TABLE IF NOT EXISTS zsgo_web_saft_pedido (
+    process_id     TEXT         PRIMARY KEY,
+    export_type    TEXT,
+    periodo        TEXT,
+    estado         TEXT         NOT NULL DEFAULT 'pending',
+    download_url   TEXT,
+    erro           TEXT,
+    pedido_por     TEXT,
+    criado_em      TIMESTAMP(3) NOT NULL DEFAULT now(),
+    atualizado_em  TIMESTAMP(3) NOT NULL DEFAULT now()
+);

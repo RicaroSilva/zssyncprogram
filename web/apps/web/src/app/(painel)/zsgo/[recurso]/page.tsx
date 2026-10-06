@@ -12,6 +12,9 @@ import { buttonVariants } from "@/components/button";
 import { Notice } from "@/components/notice";
 import { Paginacao } from "@/components/paginacao";
 import { NovoSemLista } from "./novo-sem-lista";
+import { listarPedidosSaft, nomeEstadoSaft, saftEmCurso } from "@/lib/zsgo/saft";
+import { AtualizarSozinho } from "./[chave]/atualizar-sozinho";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +34,7 @@ export default async function PaginaListaZsgo({ params, searchParams }: { params
   // Sem lista (ex.: SAF-T): mostra logo o formulário de criar.
   if (!ops.listar) {
     const opcoes = await opcoesParaEsquema(ops.criar?.corpo ?? null);
+    const pedidosSaft = slug === "saft" ? await listarPedidosSaft().catch(() => []) : [];
     return (
       <div>
         <Link href="/zsgo" className="text-sm font-semibold text-accent hover:underline">
@@ -51,6 +55,56 @@ export default async function PaginaListaZsgo({ params, searchParams }: { params
           </div>
         ) : (
           <Notice className="mt-6">O seu perfil não pode criar nesta área.</Notice>
+        )}
+        {slug === "saft" && (
+          <section className="mt-10">
+            <AtualizarSozinho ativo={pedidosSaft.some((p) => saftEmCurso(p.estado))} segundos={10} />
+            <h2 className="text-2xl font-bold tracking-tight">Pedidos de SAF-T</h2>
+            {pedidosSaft.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">Ainda não foi pedido nenhum SAF-T nesta página.</p>
+            ) : (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-left text-muted-foreground">
+                      <th className="py-2 pr-4">Pedido em</th>
+                      <th className="py-2 pr-4">Período</th>
+                      <th className="py-2 pr-4">Estado</th>
+                      <th className="py-2 pr-4">Pedido por</th>
+                      <th className="py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pedidosSaft.map((p) => {
+                      const aGerar = saftEmCurso(p.estado);
+                      const falhou = ["failed", "error", "expired"].includes(p.estado.toLowerCase());
+                      return (
+                        <tr key={p.process_id} className="border-b border-border">
+                          <td className="whitespace-nowrap py-2 pr-4">{p.criado_em.toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short" })}</td>
+                          <td className="py-2 pr-4">{p.periodo ?? p.export_type ?? "—"}</td>
+                          <td className={cn("py-2 pr-4 font-semibold", !aGerar && !falhou && "text-success", falhou && "text-destructive")} title={p.erro ?? undefined}>
+                            {aGerar && <span className="mr-1.5 inline-block h-2 w-2 animate-pulse rounded-full bg-primary" aria-hidden />}
+                            {nomeEstadoSaft(p.estado)}
+                          </td>
+                          <td className="py-2 pr-4 text-muted-foreground">{p.pedido_por ?? "—"}</td>
+                          <td className="whitespace-nowrap py-2 text-right">
+                            {!aGerar && !falhou && ops.descarregar && (
+                              <a href={`/api/zsgo/ficheiro?recurso=saft&tipo=descarregar&chave=${encodeURIComponent(p.process_id)}`} className="mr-4 font-semibold text-accent hover:underline">
+                                Descarregar
+                              </a>
+                            )}
+                            <Link href={`/zsgo/saft/${encodeURIComponent(p.process_id)}`} className="text-accent hover:underline">
+                              Ver
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         )}
         {recurso.parametro && (
           <form method="get" action={`/zsgo/${slug}/consultar`} className="mt-8 flex flex-wrap items-end gap-2">

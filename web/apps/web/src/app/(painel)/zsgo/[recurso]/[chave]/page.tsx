@@ -10,6 +10,9 @@ import { buttonVariants } from "@/components/button";
 import { Notice } from "@/components/notice";
 import type { TipoOperacao } from "../../actions";
 import { BotoesAcao } from "./botoes";
+import { AtualizarSozinho } from "./atualizar-sozinho";
+import { atualizarPedidoSaft, nomeEstadoSaft, saftEmCurso } from "@/lib/zsgo/saft";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +31,8 @@ export default async function PaginaDetalheZsgo({ params, searchParams }: { para
   let dados: unknown = null;
   let erro: string | null = null;
   try {
-    dados = await obter(ops.ver.caminho, parametros);
+    // SAF-T: lê o estado e guarda-o na lista de pedidos.
+    dados = slug === "saft" ? ((await atualizarPedidoSaft(chave)) ?? (await obter(ops.ver.caminho, parametros))) : await obter(ops.ver.caminho, parametros);
   } catch (e) {
     erro = descreverErro(e);
   }
@@ -51,6 +55,10 @@ export default async function PaginaDetalheZsgo({ params, searchParams }: { para
   if (ops.eliminar && pode(sessao, "ZSGO", "eliminar")) acoes.push("eliminar");
   const ficheiro = (tipo: string) => `/api/zsgo/ficheiro?recurso=${slug}&tipo=${tipo}&chave=${encodeURIComponent(chave)}`;
   const pdfDireto = primeiroValor(dados, ["pdf_url"]);
+  // SAF-T: estado do pedido (o ZSGO gera o ficheiro em segundo plano).
+  const saft = slug === "saft" && dados && typeof dados === "object" ? (dados as { status?: string; error_message?: string; period?: { start_date?: string; end_date?: string }; created_at?: string }) : null;
+  const saftAGerar = !!saft && saftEmCurso(saft.status);
+  const saftPronto = !!saft && !saftAGerar && !["failed", "error", "expired"].includes((saft.status ?? "").toLowerCase());
 
   return (
     <div>
@@ -60,7 +68,9 @@ export default async function PaginaDetalheZsgo({ params, searchParams }: { para
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-accent">{recurso.singular}</p>
-          <h1 className="mt-1 text-4xl font-bold tracking-tight">{titulo}</h1>
+          <h1 className="mt-1 text-4xl font-bold tracking-tight">
+            {saft?.period?.start_date ? `${saft.period.start_date.slice(0, 4) === saft.period.end_date?.slice(0, 4) && saft.period.start_date.endsWith("-01-01") && saft.period.end_date?.endsWith("-12-31") ? `Ano ${saft.period.start_date.slice(0, 4)}` : `${saft.period.start_date} a ${saft.period.end_date ?? "?"}`}` : titulo}
+          </h1>
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex flex-wrap justify-end gap-2">
@@ -79,7 +89,7 @@ export default async function PaginaDetalheZsgo({ params, searchParams }: { para
                 XML (CIUS-PT)
               </a>
             )}
-            {ops.descarregar && (
+            {ops.descarregar && slug !== "saft" && (
               <a href={ficheiro("descarregar")} className={buttonVariants({ variant: "outline", size: "sm" })}>
                 Descarregar ficheiro
               </a>
@@ -93,7 +103,31 @@ export default async function PaginaDetalheZsgo({ params, searchParams }: { para
           {acoes.length > 0 && <BotoesAcao slug={slug} chave={chave} singular={recurso.singular} acoes={acoes} />}
         </div>
       </div>
-      {sp.criado && <Notice className="mt-6">Criado no ZSGO.</Notice>}
+      {sp.criado && slug !== "saft" && <Notice className="mt-6">Criado no ZSGO.</Notice>}
+      {saft && (
+        <div className="mt-6 rounded-card border border-border bg-surface p-6">
+          <AtualizarSozinho ativo={saftAGerar} />
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Estado do pedido</p>
+              <p className={cn("mt-1 flex items-center gap-2 font-heading text-2xl font-bold", saftPronto && "text-success", !saftAGerar && !saftPronto && "text-destructive")}>
+                {saftAGerar && <span className="inline-block h-2.5 w-2.5 animate-pulse rounded-full bg-primary" aria-hidden />}
+                {nomeEstadoSaft(saft.status)}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {saft.period?.start_date ? `Período ${saft.period.start_date} a ${saft.period.end_date ?? "?"}` : ""}
+                {saftAGerar ? " · o ZSGO está a gerar o ficheiro; esta página atualiza-se sozinha a cada 5 segundos." : ""}
+              </p>
+              {saft.error_message && <p className="mt-2 text-sm text-destructive">{saft.error_message}</p>}
+            </div>
+            {saftPronto && ops.descarregar && (
+              <a href={ficheiro("descarregar")} className={buttonVariants({})}>
+                Descarregar SAF-T
+              </a>
+            )}
+          </div>
+        </div>
+      )}
       {sp.guardado && <Notice className="mt-6">Alterações guardadas no ZSGO.</Notice>}
       {erro ? (
         <p className="mt-6 rounded-lg border border-destructive-40 bg-destructive-10 p-4 text-sm text-destructive">{erro}</p>
