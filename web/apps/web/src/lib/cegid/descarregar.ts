@@ -27,6 +27,8 @@ export interface EstadoDownload {
   paralelosAtuais: number;
   /** Limite automático (desce quando o Cegid responde 429, sobe aos poucos sem 429). */
   limiteAutomatico: number;
+  /** Ritmo a que se pedem páginas ao Cegid (ajustado sozinho conforme os 429). */
+  paginasPorMinuto: number;
   segundosPorDocumento: number;
   esperas429: number;
   /** Pedidos ao Cegid nesta execução, por tipo, e quantos levaram 429. */
@@ -63,6 +65,7 @@ const estado: EstadoDownload = (g.__downloadCegid ??= {
   ultimaMensagem: "",
   paralelosAtuais: 0,
   limiteAutomatico: 0,
+  paginasPorMinuto: 0,
   segundosPorDocumento: 0,
   esperas429: 0,
   pedidos: {},
@@ -107,6 +110,7 @@ export function iniciarDownload(iniciadoPor: string, repetirErros: boolean, soAn
     errosNestaExecucao: 0,
     paralelosAtuais: 0,
     limiteAutomatico: 0,
+    paginasPorMinuto: 0,
     segundosPorDocumento: 0,
     esperas429: 0,
     pedidos: {},
@@ -146,26 +150,45 @@ interface Pendente {
 const lerParalelos = () => Math.max(1, Math.min(40, cfgInt("cegid.download.paralelos", 12)));
 
 /**
- * Ajuste automático: um 429 do Cegid baixa o limite para 3/4 (mínimo 2) —
- * no máximo uma vez a cada 15 s, porque vários pedidos recebem o mesmo 429
- * ao mesmo tempo; cada 40 faturas seguidas sem 429 sobem-no 1, até ao valor
- * do config.properties.
+ * O Cegid limita os pedidos por minuto (não quantos ao mesmo tempo). Por isso
+ * os pedidos ao Cegid (página, link, gerar documento) são espaçados a um ritmo
+ * certo — X por minuto — em vez de saírem em rajada e levarem 429 (cada 429
+ * custa uma espera longa). O ritmo ajusta-se sozinho: um 429 baixa-o 20% (no
+ * máximo uma vez a cada 15 s); cada 20 pedidos seguidos sem 429 sobem-no 1,
+ * até cegid.download.paginas_por_minuto_max. O PDF vem de outro servidor e não
+ * entra neste ritmo. Os paralelos (cegid.download.paralelos) só servem para
+ * que o PDF e o S3 de uma fatura não atrasem a seguinte.
  */
-const ajuste = { limite: 0, ultimoCorte: 0, semTravao: 0 };
+const ritmo = { porMinuto: 0, proximo: 0, ultimoCorte: 0, semTravao: 0 };
+const ritmoInicial = () => Math.max(1, cfgInt("cegid.download.paginas_por_minuto", 15));
+const ritmoMaximo = () => Math.max(ritmoInicial(), cfgInt("cegid.download.paginas_por_minuto_max", 60));
+
+async function vezNoCegid() {
+  if (!ritmo.porMinuto) ritmo.porMinuto = ritmoInicial();
+  const agora = Date.now();
+  const quando = Math.max(agora, ritmo.proximo);
+  ritmo.proximo = quando + 60_000 / ritmo.porMinuto;
+  estado.paginasPorMinuto = Math.round(ritmo.porMinuto);
+  if (quando > agora) await espera(quando - agora);
+}
 function travaoRecebido() {
-  if (Date.now() - ajuste.ultimoCorte < 15_000) return;
-  ajuste.ultimoCorte = Date.now();
-  ajuste.semTravao = 0;
-  ajuste.limite = Math.max(2, Math.floor((ajuste.limite || lerParalelos()) * 0.75));
-  estado.limiteAutomatico = ajuste.limite;
+  if (Date.now() - ritmo.ultimoCorte < 15_000) return;
+  ritmo.ultimoCorte = Date.now();
+  ritmo.semTravao = 0;
+  ritmo.porMinuto = Math.max(2, (ritmo.porMinuto || ritmoInicial()) * 0.8);
+  estado.paginasPorMinuto = Math.round(ritmo.porMinuto);
+}
+function pedidoCegidSemTravao() {
+  if (++ritmo.semTravao < 20) return;
+  ritmo.semTravao = 0;
+  ritmo.porMinuto = Math.min(ritmoMaximo(), (ritmo.porMinuto || ritmoInicial()) + 1);
+  estado.paginasPorMinuto = Math.round(ritmo.porMinuto);
 }
 function faturaSemTravao() {
-  if (++ajuste.semTravao < 40) return;
-  ajuste.semTravao = 0;
-  ajuste.limite = Math.min(lerParalelos(), (ajuste.limite || lerParalelos()) + 1);
-  estado.limiteAutomatico = ajuste.limite;
+  /* o ajuste é feito por pedido ao Cegid (pedidoCegidSemTravao) */
 }
-const limiteAtual = () => Math.min(lerParalelos(), ajuste.limite || lerParalelos());
+const ajuste = { limite: 0 };
+const limiteAtual = () => lerParalelos();
 
 /**
  * Dividir o download por vários PCs (cada um com a sua ligação à internet,
@@ -209,7 +232,9 @@ async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
 
   let ativos = 0;
   ajuste.limite = lerParalelos();
-  estado.limiteAutomatico = ajuste.limite;
+  estado.limiteAutomatico = 0;
+  ritmo.porMinuto = ritmo.porMinuto || ritmoInicial();
+  estado.paginasPorMinuto = Math.round(ritmo.porMinuto);
   let alvo = limiteAtual();
   let ultimoAjuste = Date.now();
   const trabalhadores: Promise<void>[] = [];
@@ -490,9 +515,12 @@ async function pedir(u: string, passos?: string[]): Promise<Response> {
   for (let tentativa = 1; ; tentativa++) {
     const falta = travao.ate - Date.now();
     if (falta > 0) await espera(falta);
+    const doCegid = tipo !== "outro";
+    if (doCegid) await vezNoCegid();
     const r = await fetch(u, { redirect: "follow", signal: AbortSignal.timeout(90_000), headers: { "user-agent": "Mozilla/5.0 (faturacao-web; copia de documentos)" } });
     if (r.redirected || (r.url && r.url !== u)) contarPedido("redirecionamento", false);
     contarPedido(tipo, r.status === 429);
+    if (doCegid && r.status !== 429) pedidoCegidSemTravao();
     if (r.status !== 429 || tentativa >= 4) return r;
     const segundos = Math.min(120, Number(r.headers.get("retry-after")) || 10 * tentativa);
     passos?.push(`429 (demasiados pedidos) — espero ${segundos} s e tento outra vez`);

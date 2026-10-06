@@ -401,6 +401,10 @@ creditnote.query=\
 # pedidos), todos esperam e o limite desce sozinho (3/4); sem 429 volta a
 # subir aos poucos até este máximo.
 #cegid.download.paralelos=12
+# Ritmo dos pedidos ao Cegid (páginas por minuto): começa neste valor, desce
+# sozinho quando o Cegid responde 429 e sobe devagar até ao máximo.
+#cegid.download.paginas_por_minuto=15
+#cegid.download.paginas_por_minuto_max=60
 # Dividir o download por vários PCs (cada um com a sua ligação à internet, se
 # o Cegid limitar por IP): num PC parte=1, no outro parte=2 (nunca repetem).
 #cegid.download.dividir_por=2
