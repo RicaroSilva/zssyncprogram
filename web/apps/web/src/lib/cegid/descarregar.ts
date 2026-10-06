@@ -29,6 +29,8 @@ export interface EstadoDownload {
   limiteAutomatico: number;
   /** Ritmo a que se pedem páginas ao Cegid (ajustado sozinho conforme os 429). */
   paginasPorMinuto: number;
+  /** Faturas guardadas por minuto nos últimos ~10 minutos (sem contar a pré-análise). */
+  porMinutoRecente: number;
   segundosPorDocumento: number;
   esperas429: number;
   /** Pedidos ao Cegid nesta execução, por tipo, e quantos levaram 429. */
@@ -66,6 +68,7 @@ const estado: EstadoDownload = (g.__downloadCegid ??= {
   paralelosAtuais: 0,
   limiteAutomatico: 0,
   paginasPorMinuto: 0,
+  porMinutoRecente: 0,
   segundosPorDocumento: 0,
   esperas429: 0,
   pedidos: {},
@@ -111,6 +114,7 @@ export function iniciarDownload(iniciadoPor: string, repetirErros: boolean, soAn
     paralelosAtuais: 0,
     limiteAutomatico: 0,
     paginasPorMinuto: 0,
+    porMinutoRecente: 0,
     segundosPorDocumento: 0,
     esperas429: 0,
     pedidos: {},
@@ -203,6 +207,8 @@ export function divisaoDownload(): { de: number; parte: number } {
 }
 
 async function correr(armazenamento: Armazenamento, repetirErros: boolean) {
+  concluidas.length = 0;
+  estado.porMinutoRecente = 0;
   const divisao = divisaoDownload();
   const pausa = Math.max(0, cfgInt("cegid.download.pausa_ms", 0));
   let errosSeguidos = 0;
@@ -412,6 +418,16 @@ async function analisar(armazenamento: Armazenamento): Promise<ResultadoAnalise>
   return resultado;
 }
 
+/** Horas a que as últimas faturas ficaram guardadas — para o ritmo real (janela de 10 min). */
+const concluidas: number[] = [];
+function registarConclusao() {
+  const agora = Date.now();
+  concluidas.push(agora);
+  while (concluidas.length && agora - concluidas[0]! > 10 * 60_000) concluidas.shift();
+  const janela = Math.max(60_000, agora - (concluidas[0] ?? agora));
+  estado.porMinutoRecente = concluidas.length > 1 ? Math.round(((concluidas.length - 1) / janela) * 60_000 * 10) / 10 : 0;
+}
+
 async function descarregarUm(armazenamento: Armazenamento, doc: Pendente): Promise<boolean> {
   try {
     const { dados, tipo } = await obterComAlternativas(doc.document_cw_url);
@@ -425,6 +441,7 @@ async function descarregarUm(armazenamento: Armazenamento, doc: Pendente): Promi
       ON CONFLICT (mpinv_id) DO UPDATE SET estado = 'OK', chave = EXCLUDED.chave, tamanho = EXCLUDED.tamanho, sha256 = EXCLUDED.sha256,
         tipo = EXCLUDED.tipo, erro = NULL, tentativas = zsgo_web_cegid_documento.tentativas + 1, atualizado_em = now()`;
     estado.feitosNestaExecucao++;
+    registarConclusao();
     return true;
   } catch (e) {
     const erro = descreverErro(e).slice(0, 2000);

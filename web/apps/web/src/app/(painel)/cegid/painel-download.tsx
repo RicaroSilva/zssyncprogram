@@ -41,7 +41,8 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
 
   // Velocidade desta execução e tempo que falta (com o ritmo atual).
   const minutos = estado.iniciadoEm ? (Date.now() - new Date(estado.iniciadoEm).getTime()) / 60000 : 0;
-  const porMinuto = estado.aCorrer && minutos > 0.2 ? estado.feitosNestaExecucao / minutos : 0;
+  // Ritmo dos últimos minutos de download (a pré-análise do início não conta).
+  const porMinuto = estado.aCorrer ? estado.porMinutoRecente || (minutos > 0.2 ? estado.feitosNestaExecucao / minutos : 0) : 0;
   const pct = contagem.total ? Math.floor((contagem.guardados / contagem.total) * 1000) / 10 : 0;
   const falta = Math.max(0, contagem.total - contagem.guardados - contagem.comErro);
 
@@ -117,7 +118,7 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
         </p>
         {porMinuto > 0 && (
           <p className="mt-1 text-sm text-muted-foreground">
-            Ritmo: <b className="font-semibold text-foreground">{n(Math.round(porMinuto))} por minuto</b> · faltam cerca de{" "}
+            Ritmo (últimos minutos): <b className="font-semibold text-foreground">{n(Math.round(porMinuto))} por minuto</b> · faltam cerca de{" "}
             <b className="font-semibold text-foreground">{duracao(falta / porMinuto)}</b>
             {estado.paralelosAtuais ? ` · ${estado.paralelosAtuais} ao mesmo tempo` : ""}
             {estado.paginasPorMinuto ? ` · ritmo do Cegid ${estado.paginasPorMinuto} páginas/min (automático)` : ""}
