@@ -1,7 +1,8 @@
 "use server";
 
 import { headers } from "next/headers";
-import { exigirPermissao } from "@/lib/exigir-permissao";
+import { exigirPermissao, pode } from "@/lib/exigir-permissao";
+import { obterSessaoAtual } from "@/lib/auth";
 import { registarAuditoria } from "@/lib/auditoria";
 import { obterIpCliente } from "@/lib/rede-confianca";
 import { contagemDocumentos, divisaoDownload, estadoDownload, iniciarDownload, pararDownload, testarDocumento, type EstadoDownload } from "@/lib/cegid/descarregar";
@@ -28,8 +29,10 @@ export async function pararDownloadAction(): Promise<void> {
   pararDownload();
 }
 
-export async function progressoDownloadAction(): Promise<{ estado: EstadoDownload; contagem: Awaited<ReturnType<typeof contagemDocumentos>>; divisao: { de: number; parte: number } }> {
-  await exigirPermissao("FATURACAO", "consultar");
+/** Progresso para o painel; null se a sessão expirou (o painel deixa de perguntar). */
+export async function progressoDownloadAction(): Promise<{ estado: EstadoDownload; contagem: Awaited<ReturnType<typeof contagemDocumentos>>; divisao: { de: number; parte: number } } | null> {
+  const sessao = await obterSessaoAtual();
+  if (!sessao || !pode(sessao, "FATURACAO", "consultar")) return null;
   return { estado: estadoDownload(), contagem: await contagemDocumentos(), divisao: divisaoDownload() };
 }
 

@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/button";
 import { iniciarDownloadAction, pararDownloadAction, progressoDownloadAction, testarDocumentoAction } from "./actions";
 
-type Progresso = Awaited<ReturnType<typeof progressoDownloadAction>>;
+type Progresso = NonNullable<Awaited<ReturnType<typeof progressoDownloadAction>>>;
 
 const n = (x: number) => new Intl.NumberFormat("pt-PT").format(x);
 
@@ -20,23 +20,32 @@ function duracao(minutos: number): string {
 export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Progresso; podeIniciar: boolean; destino: string | null }) {
   const [p, setP] = useState(inicial);
   const [erro, setErro] = useState<string | null>(null);
+  const [semSessao, setSemSessao] = useState(false);
   const [idTeste, setIdTeste] = useState("");
   const [teste, setTeste] = useState<Awaited<ReturnType<typeof testarDocumentoAction>> | null>(null);
   const [pendente, iniciar] = useTransition();
   const { estado, contagem, divisao } = p;
 
   useEffect(() => {
-    if (!estado.aCorrer) return;
-    const t = setInterval(() => progressoDownloadAction().then(setP).catch(() => {}), 3000);
+    if (!estado.aCorrer || semSessao) return;
+    const t = setInterval(
+      () =>
+        progressoDownloadAction()
+          .then((r) => (r ? setP(r) : setSemSessao(true)))
+          .catch(() => {}),
+      3000,
+    );
     return () => clearInterval(t);
-  }, [estado.aCorrer]);
+  }, [estado.aCorrer, semSessao]);
 
   const acao = (f: () => Promise<unknown>) =>
     iniciar(async () => {
       setErro(null);
       const r = (await f()) as { ok?: boolean; erro?: string } | undefined;
       if (r && r.ok === false) setErro(r.erro ?? "Não foi possível.");
-      setP(await progressoDownloadAction());
+      const novo = await progressoDownloadAction();
+      if (novo) setP(novo);
+      else setSemSessao(true);
     });
 
   // Velocidade desta execução e tempo que falta (com o ritmo atual).
@@ -236,6 +245,15 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
             </details>
           )}
         </div>
+      )}
+      {semSessao && (
+        <p className="mt-3 text-sm text-destructive">
+          A sessão expirou. O download continua a correr no servidor —{" "}
+          <a href="/login" className="font-semibold underline">
+            entre outra vez
+          </a>{" "}
+          para ver o progresso.
+        </p>
       )}
       {!destino && <p className="mt-3 text-sm text-destructive">Falta configurar o S3 no config.properties (cegid.s3.endpoint, cegid.s3.bucket, cegid.s3.access_key, cegid.s3.secret_key).</p>}
       {erro && <p className="mt-3 text-sm text-destructive">{erro}</p>}

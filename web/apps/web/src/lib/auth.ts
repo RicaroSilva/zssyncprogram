@@ -5,7 +5,10 @@ import { obterIpCliente } from "./rede-confianca";
 import { RECURSOS, type Recurso } from "./recursos";
 
 export const COOKIE_SESSAO = "faturacao_sessao";
-const DURACAO_SESSAO_MS = 8 * 60 * 60 * 1000; // 8h
+/** A sessão expira ao fim de 8 h SEM USO (cada pedido prolonga-a), e nunca
+ *  dura mais de 7 dias desde o login. */
+const DURACAO_SESSAO_MS = 8 * 60 * 60 * 1000; // 8h sem uso
+const MAXIMO_SESSAO_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
 export type Acao = "consultar" | "criar" | "editar" | "eliminar";
 export type Permissoes = Partial<Record<Recurso, Record<Acao, boolean>>>;
@@ -44,7 +47,8 @@ export async function criarSessao(utilizadorId: string): Promise<string> {
     secure: cabecalhos.get("x-forwarded-proto") === "https",
     sameSite: "lax",
     path: "/",
-    expires: expiraEm,
+    // O cookie dura o máximo; quem decide se a sessão ainda vale é a base de dados (expira_em).
+    expires: new Date(Date.now() + MAXIMO_SESSAO_MS),
   });
   return sessao.id;
 }
@@ -60,6 +64,11 @@ export async function obterSessaoAtual(): Promise<SessaoAtual | null> {
   });
   if (!sessao || sessao.revogadaEm || sessao.expiraEm < new Date()) return null;
   if (sessao.utilizador.estado !== "ATIVO") return null;
+  // Prolonga a sessão com o uso (no máximo uma escrita a cada 10 minutos).
+  const novaExpiracao = Math.min(Date.now() + DURACAO_SESSAO_MS, sessao.criadoEm.getTime() + MAXIMO_SESSAO_MS);
+  if (novaExpiracao - sessao.expiraEm.getTime() > 10 * 60 * 1000) {
+    await prisma.sessao.update({ where: { id: sessao.id }, data: { expiraEm: new Date(novaExpiracao) } }).catch(() => {});
+  }
 
   const perfis = sessao.utilizador.perfis.map((p) => p.perfil);
   const superAdmin = perfis.some((p) => p.superAdmin);
