@@ -537,7 +537,9 @@ async function pedir(u: string, passos?: string[]): Promise<Response> {
   for (let tentativa = 1; ; tentativa++) {
     const falta = travao.ate - Date.now();
     if (falta > 0) await espera(falta);
-    const doCegid = tipo !== "outro";
+    // Só a página, o link e o pedido de gerar documento contam para o ritmo do Cegid;
+    // o PDF ("ficheiro") não é limitado — se um dia levar 429, o travão trata disso.
+    const doCegid = tipo === "página" || tipo === "link guardado" || tipo === "gerar documento";
     if (doCegid) await vezNoCegid();
     const r = await fetch(u, { redirect: "follow", signal: AbortSignal.timeout(90_000), headers: { "user-agent": "Mozilla/5.0 (faturacao-web; copia de documentos)" } });
     if (r.redirected || (r.url && r.url !== u)) contarPedido("redirecionamento", false);

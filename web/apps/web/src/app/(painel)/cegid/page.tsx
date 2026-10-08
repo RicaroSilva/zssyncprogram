@@ -10,6 +10,7 @@ import { Notice } from "@/components/notice";
 import { cn } from "@/lib/utils";
 import { listarFaturasCegid, temHistoricoCegid, ultimoMesCegid, type FiltroCopia } from "@/lib/cegid/historico";
 import { contagemDocumentos, divisaoDownload, estadoDownload } from "@/lib/cegid/descarregar";
+import { prisma } from "@/lib/db";
 import { armazenamentoConfigurado } from "@/lib/cegid/armazenamento";
 import { configExiste } from "@/lib/config";
 import { PainelDownload } from "./painel-download";
@@ -44,9 +45,13 @@ export default async function PaginaCegid({ searchParams }: { searchParams: Prom
   const q = parametros.q?.trim() || undefined;
   const pagina = Math.max(1, Number(parametros.pagina) || 1);
 
-  const [{ faturas, total, valor }, contagem] = await Promise.all([
+  const [{ faturas, total, valor }, contagem, errosComuns] = await Promise.all([
     listarFaturasCegid({ ...(todos ? {} : mes), q, copia, pagina, porPagina: POR_PAGINA }),
     contagemDocumentos(),
+    // Os erros de download mais frequentes (pelo início da mensagem).
+    prisma.$queryRaw<Array<{ erro: string; n: bigint }>>`
+      SELECT left(coalesce(erro, '—'), 200) AS erro, COUNT(*) AS n FROM zsgo_web_cegid_documento
+      WHERE estado = 'ERRO' GROUP BY 1 ORDER BY 2 DESC LIMIT 5`.catch(() => []),
   ]);
   const nomes = await nomesUtilizadoresCyclos(faturas.flatMap((f) => (f.related_to_user_id ? [f.user_id, f.related_to_user_id] : [f.user_id])));
   let destino: string | null = null;
@@ -77,6 +82,23 @@ export default async function PaginaCegid({ searchParams }: { searchParams: Prom
       <div className="mt-6">
         <PainelDownload inicial={{ estado: estadoDownload(), contagem, divisao: divisaoDownload() }} podeIniciar={pode(sessao, "FATURACAO", "criar")} destino={destino} />
       </div>
+
+      {errosComuns.length > 0 && (
+        <details className="mt-4 rounded-card border border-border bg-surface p-4 text-sm">
+          <summary className="cursor-pointer font-semibold">Erros ao descarregar mais comuns</summary>
+          <ul className="mt-2 space-y-1">
+            {errosComuns.map((e) => (
+              <li key={e.erro} className="flex gap-3">
+                <span className="w-14 shrink-0 text-right font-semibold tabular-nums text-destructive">{Number(e.n).toLocaleString("pt-PT")}</span>
+                <span className="break-words text-muted-foreground">{e.erro}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-muted-foreground">
+            Para tentar de novo: <b>Tentar outra vez os que falharam</b>. Para os ver um a um: filtro <b>Erro ao descarregar</b>.
+          </p>
+        </details>
+      )}
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2">
