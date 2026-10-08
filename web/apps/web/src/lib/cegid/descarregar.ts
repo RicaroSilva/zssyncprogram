@@ -91,6 +91,25 @@ export async function contagemDocumentos(): Promise<{ total: number; guardados: 
   return { total: Number(l?.total ?? 0), guardados: Number(l?.guardados ?? 0), comErro: Number(l?.com_erro ?? 0), semLink: Number(l?.sem_link ?? 0) };
 }
 
+export interface Enviada {
+  mpinv_id: number;
+  numero: string | null;
+  user_id: string;
+  ano: number;
+  mes: number;
+  chave: string | null;
+  atualizado_em: Date;
+}
+
+/** As últimas faturas guardadas no S3 pelo download (não as que já lá estavam). */
+export async function ultimasEnviadas(n = 5): Promise<Enviada[]> {
+  return prisma.$queryRaw<Enviada[]>`
+    SELECT d.mpinv_id, i.document_cw_number AS numero, i.user_id::text AS user_id, i.year::int AS ano, i.month::int AS mes, d.chave, d.atualizado_em
+    FROM zsgo_web_cegid_documento d JOIN lp_cloudware_monthly_processing_invoices i ON i.mpinv_id = d.mpinv_id
+    WHERE d.estado = 'OK' AND d.tentativas > 0
+    ORDER BY d.atualizado_em DESC LIMIT ${n}`;
+}
+
 export function pararDownload(): void {
   if (estado.aCorrer) {
     estado.pararPedido = true;

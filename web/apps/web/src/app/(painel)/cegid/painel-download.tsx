@@ -24,7 +24,7 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
   const [idTeste, setIdTeste] = useState("");
   const [teste, setTeste] = useState<Awaited<ReturnType<typeof testarDocumentoAction>> | null>(null);
   const [pendente, iniciar] = useTransition();
-  const { estado, contagem, divisao } = p;
+  const { estado, contagem, divisao, ultimas } = p;
 
   useEffect(() => {
     if (!estado.aCorrer || semSessao) return;
@@ -244,6 +244,29 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
               </ul>
             </details>
           )}
+        </div>
+      )}
+      {ultimas.length > 0 && (
+        <div className="mt-4 text-sm">
+          <p className="font-semibold">Últimas enviadas para o S3</p>
+          <ul className="mt-1 divide-y divide-[--border]">
+            {ultimas.map((u) => (
+              <li key={u.mpinv_id} className="flex flex-wrap items-baseline gap-x-4 py-1">
+                <span className="w-28 shrink-0 tabular-nums text-muted-foreground">
+                  {new Date(u.atualizado_em).toLocaleString("pt-PT", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                </span>
+                <a href={`/cegid/${u.mpinv_id}`} className="font-semibold text-accent hover:underline">
+                  {u.numero ?? `nº interno ${u.mpinv_id}`}
+                </a>
+                <span className="text-muted-foreground">
+                  {String(u.mes).padStart(2, "0")}/{u.ano} · cliente {u.user_id}
+                </span>
+                <a href={`/api/cegid/documento/${u.mpinv_id}`} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                  PDF
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {semSessao && (

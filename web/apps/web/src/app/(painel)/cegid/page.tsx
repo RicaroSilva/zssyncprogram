@@ -9,7 +9,7 @@ import { Paginacao } from "@/components/paginacao";
 import { Notice } from "@/components/notice";
 import { cn } from "@/lib/utils";
 import { listarFaturasCegid, temHistoricoCegid, ultimoMesCegid, type FiltroCopia } from "@/lib/cegid/historico";
-import { contagemDocumentos, divisaoDownload, estadoDownload } from "@/lib/cegid/descarregar";
+import { contagemDocumentos, divisaoDownload, estadoDownload, ultimasEnviadas } from "@/lib/cegid/descarregar";
 import { prisma } from "@/lib/db";
 import { armazenamentoConfigurado } from "@/lib/cegid/armazenamento";
 import { configExiste } from "@/lib/config";
@@ -45,13 +45,14 @@ export default async function PaginaCegid({ searchParams }: { searchParams: Prom
   const q = parametros.q?.trim() || undefined;
   const pagina = Math.max(1, Number(parametros.pagina) || 1);
 
-  const [{ faturas, total, valor }, contagem, errosComuns] = await Promise.all([
+  const [{ faturas, total, valor }, contagem, errosComuns, ultimas] = await Promise.all([
     listarFaturasCegid({ ...(todos ? {} : mes), q, copia, pagina, porPagina: POR_PAGINA }),
     contagemDocumentos(),
     // Os erros de download mais frequentes (pelo início da mensagem).
     prisma.$queryRaw<Array<{ erro: string; n: bigint }>>`
       SELECT left(coalesce(erro, '—'), 200) AS erro, COUNT(*) AS n FROM zsgo_web_cegid_documento
       WHERE estado = 'ERRO' GROUP BY 1 ORDER BY 2 DESC LIMIT 5`.catch(() => []),
+    ultimasEnviadas().catch(() => []),
   ]);
   const nomes = await nomesUtilizadoresCyclos(faturas.flatMap((f) => (f.related_to_user_id ? [f.user_id, f.related_to_user_id] : [f.user_id])));
   let destino: string | null = null;
@@ -61,7 +62,9 @@ export default async function PaginaCegid({ searchParams }: { searchParams: Prom
     destino = null;
   }
   const chave = todos ? "todos" : chaveMes(mes);
-  const hrefFiltro = (v: string) => `/cegid?mes=${chave}${v ? `&copia=${v}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
+  // Erros, por descarregar e mal geradas veem-se em todos os meses (estão espalhados pelo histórico).
+  const hrefFiltro = (v: string) =>
+    `/cegid?mes=${v === "ERRO" || v === "FALTA" || v === "INCOMPLETA" ? "todos" : chave}${v ? `&copia=${v}` : ""}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
 
   return (
     <div>
@@ -80,7 +83,7 @@ export default async function PaginaCegid({ searchParams }: { searchParams: Prom
       </p>
 
       <div className="mt-6">
-        <PainelDownload inicial={{ estado: estadoDownload(), contagem, divisao: divisaoDownload() }} podeIniciar={pode(sessao, "FATURACAO", "criar")} destino={destino} />
+        <PainelDownload inicial={{ estado: estadoDownload(), contagem, divisao: divisaoDownload(), ultimas }} podeIniciar={pode(sessao, "FATURACAO", "criar")} destino={destino} />
       </div>
 
       {errosComuns.length > 0 && (
@@ -170,8 +173,9 @@ export default async function PaginaCegid({ searchParams }: { searchParams: Prom
                       PDF guardado
                     </a>
                   ) : f.copia_estado === "ERRO" ? (
-                    <span className="text-destructive" title={f.copia_erro ?? ""}>
+                    <span className="block max-w-xs whitespace-normal text-destructive" title={f.copia_erro ?? ""}>
                       Erro
+                      {f.copia_erro && <span className="mt-0.5 block text-xs text-muted-foreground line-clamp-2">{f.copia_erro}</span>}
                     </span>
                   ) : f.document_cw_url ? (
                     <a href={f.document_cw_url} target="_blank" rel="noreferrer" className="text-accent hover:underline">

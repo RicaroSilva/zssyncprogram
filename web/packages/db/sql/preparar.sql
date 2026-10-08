@@ -236,3 +236,4 @@ CREATE TABLE IF NOT EXISTS zsgo_web_saft_pedido (
     criado_em      TIMESTAMP(3) NOT NULL DEFAULT now(),
     atualizado_em  TIMESTAMP(3) NOT NULL DEFAULT now()
 );
+CREATE INDEX IF NOT EXISTS zsgo_web_cegid_documento_atualizado_idx ON zsgo_web_cegid_documento (atualizado_em DESC);

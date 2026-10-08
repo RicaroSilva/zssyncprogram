@@ -5,7 +5,7 @@ import { exigirPermissao, pode } from "@/lib/exigir-permissao";
 import { obterSessaoAtual } from "@/lib/auth";
 import { registarAuditoria } from "@/lib/auditoria";
 import { obterIpCliente } from "@/lib/rede-confianca";
-import { contagemDocumentos, divisaoDownload, estadoDownload, iniciarDownload, pararDownload, testarDocumento, type EstadoDownload } from "@/lib/cegid/descarregar";
+import { contagemDocumentos, divisaoDownload, estadoDownload, ultimasEnviadas, type Enviada, iniciarDownload, pararDownload, testarDocumento, type EstadoDownload } from "@/lib/cegid/descarregar";
 
 export async function iniciarDownloadAction(repetirErros: boolean, soAnalisar = false): Promise<{ ok: boolean; erro?: string }> {
   const sessao = await exigirPermissao("FATURACAO", "criar");
@@ -30,10 +30,11 @@ export async function pararDownloadAction(): Promise<void> {
 }
 
 /** Progresso para o painel; null se a sessão expirou (o painel deixa de perguntar). */
-export async function progressoDownloadAction(): Promise<{ estado: EstadoDownload; contagem: Awaited<ReturnType<typeof contagemDocumentos>>; divisao: { de: number; parte: number } } | null> {
+export async function progressoDownloadAction(): Promise<{ estado: EstadoDownload; contagem: Awaited<ReturnType<typeof contagemDocumentos>>; divisao: { de: number; parte: number }; ultimas: Enviada[] } | null> {
   const sessao = await obterSessaoAtual();
   if (!sessao || !pode(sessao, "FATURACAO", "consultar")) return null;
-  return { estado: estadoDownload(), contagem: await contagemDocumentos(), divisao: divisaoDownload() };
+  const [contagem, ultimas] = await Promise.all([contagemDocumentos(), ultimasEnviadas()]);
+  return { estado: estadoDownload(), contagem, divisao: divisaoDownload(), ultimas };
 }
 
 /** Experimenta o link da fatura mais recente (ou de uma em particular), sem guardar nada. */
