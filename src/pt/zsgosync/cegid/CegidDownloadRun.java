@@ -6,6 +6,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -123,11 +126,153 @@ public class CegidDownloadRun {
    public static void main(String[] args) throws Exception {
       String ficheiro = args.length > 0 ? args[0] : "config.properties";
       AppConfig cfg = new AppConfig(ficheiro);
+      // Sem base de dados: "lista" + ficheiro CSV exportado no pgAdmin (mpinv_id, nome, url).
+      if (args.length > 2 && args[1].equalsIgnoreCase("lista")) {
+         new CegidDownloadRun(cfg, 1, 1, false).correrLista(Path.of(args[2]));
+         return;
+      }
       int de = args.length > 2 ? Integer.parseInt(args[2].trim()) : cfg.getInt("cegid.download.dividir_por", 1);
       int parte = args.length > 1 ? Integer.parseInt(args[1].trim()) : cfg.getInt("cegid.download.parte", 1);
       boolean repetir = args.length > 3 && args[3].toLowerCase(Locale.ROOT).startsWith("erro");
       if (de < 1 || parte < 1 || parte > de) throw new IllegalArgumentException("Parte inválida: " + parte + " de " + de);
       new CegidDownloadRun(cfg, parte, de, repetir).correr();
+   }
+
+   // ───────────────────────────────── modo lista (sem base de dados) ─────────────────────────────────
+
+   /**
+    * Para um PC que não chega à base de dados: lê a lista das faturas exportada
+    * no pgAdmin (colunas mpinv_id, nome, url — o nome já é o do ficheiro, sem
+    * ".pdf") e envia cada PDF para o S3. Não grava na base de dados: no fim, a
+    * "Pré-análise do S3" da aplicação web marca-as como guardadas. As feitas
+    * ficam em "<lista>.feitas.txt", para continuar onde ficou.
+    */
+   public void correrLista(Path csv) throws Exception {
+      List<String[]> linhas = lerCsv(csv);
+      Path feitasFicheiro = Path.of(csv.toString() + ".feitas.txt");
+      Path errosFicheiro = Path.of(csv.toString() + ".erros.txt");
+      Set<String> feitas = ConcurrentHashMap.newKeySet();
+      if (Files.exists(feitasFicheiro)) for (String l : Files.readAllLines(feitasFicheiro, StandardCharsets.UTF_8)) if (!l.isBlank()) feitas.add(l.trim());
+      ArrayDeque<String[]> fila = new ArrayDeque<>();
+      for (String[] l : linhas) if (!feitas.contains(l[0])) fila.add(l);
+      log("Download dos PDFs do Cegid a partir da lista " + csv.getFileName() + " (sem base de dados)");
+      log("Destino: " + s3Endpoint + "/" + s3Bucket + (prefixo.isEmpty() ? "" : "/" + prefixo));
+      log(linhas.size() + " faturas na lista, " + feitas.size() + " já feitas antes, " + fila.size() + " por fazer. (Ctrl+C para parar; volta a correr e continua onde ficou)");
+      int paralelos = Math.max(1, Math.min(20, cfg.getInt("cegid.download.paralelos", 6)));
+      long inicio = System.currentTimeMillis();
+      Object trinco = new Object();
+      Runnable trabalhador = () -> {
+         while (true) {
+            String[] l;
+            synchronized (trinco) {
+               l = fila.poll();
+            }
+            if (l == null) return;
+            if (errosSeguidos >= 50) {
+               log("PAREI: 50 faturas seguidas falharam (o Cegid pode estar em baixo). Tente mais tarde.");
+               return;
+            }
+            String id = l[0];
+            String chave = prefixo + l[1] + ".pdf";
+            try {
+               if (tamanhoNoS3(chave) != null) {
+                  jaExistiam.incrementAndGet();
+               } else {
+                  byte[] pdf = obterPdf(l[2]);
+                  guardarNoS3(chave, pdf);
+                  guardadas.incrementAndGet();
+                  ultima = chave + " (" + LocalTime.now().withNano(0) + ")";
+                  synchronized (concluidas) {
+                     long agora = System.currentTimeMillis();
+                     concluidas.add(agora);
+                     while (!concluidas.isEmpty() && agora - concluidas.peekFirst() > 600_000) concluidas.pollFirst();
+                  }
+               }
+               errosSeguidos = 0;
+               anexar(feitasFicheiro, id);
+            } catch (Exception e) {
+               erros.incrementAndGet();
+               errosSeguidos++;
+               anexar(errosFicheiro, id + ";" + chave + ";" + String.valueOf(e.getMessage()).replace('\n', ' '));
+               log("Erro na fatura nº interno " + id + " (" + chave + "): " + e.getMessage());
+            }
+         }
+      };
+      List<Thread> threads = new ArrayList<>();
+      for (int i = 0; i < paralelos; i++) {
+         Thread t = new Thread(trabalhador, "cegid-" + i);
+         t.start();
+         threads.add(t);
+      }
+      Thread estado = new Thread(() -> {
+         while (true) {
+            try {
+               Thread.sleep(30_000);
+            } catch (InterruptedException e) {
+               return;
+            }
+            mostrarEstado(inicio);
+         }
+      });
+      estado.setDaemon(true);
+      estado.start();
+      for (Thread t : threads) t.join();
+      mostrarEstado(inicio);
+      log("Terminado: " + guardadas.get() + " guardada(s), " + jaExistiam.get() + " já estavam no S3, " + erros.get() + " com erro"
+         + (erros.get() > 0 ? " (lista em " + errosFicheiro.getFileName() + "; volte a correr para tentar outra vez)" : "") + ".");
+      log("No PC da aplicação web: Histórico Cegid → Pré-análise do S3, para as marcar como guardadas.");
+   }
+
+   private static synchronized void anexar(Path f, String linha) {
+      try {
+         Files.writeString(f, linha + System.lineSeparator(), StandardCharsets.UTF_8, StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+      } catch (Exception e) {
+         log("Não consegui escrever em " + f + ": " + e.getMessage());
+      }
+   }
+
+   /** CSV do pgAdmin (com cabeçalho; separador "," ou ";"; campos entre aspas). Devolve [mpinv_id, nome, url]. */
+   static List<String[]> lerCsv(Path csv) throws Exception {
+      List<String> linhas = Files.readAllLines(csv, StandardCharsets.UTF_8);
+      if (linhas.isEmpty()) return List.of();
+      String cab = linhas.get(0).replace("\uFEFF", "");
+      char sep = cab.indexOf(';') >= 0 && cab.indexOf(',') < 0 ? ';' : ',';
+      List<String> nomesCol = new ArrayList<>();
+      for (String c : partirCsv(cab, sep)) nomesCol.add(c.trim().toLowerCase(Locale.ROOT));
+      int iId = nomesCol.indexOf("mpinv_id"), iNome = nomesCol.indexOf("nome"), iUrl = nomesCol.indexOf("url");
+      if (iId < 0 || iNome < 0 || iUrl < 0) throw new IllegalArgumentException("A lista tem de ter as colunas mpinv_id, nome e url (cabeçalho: " + cab + ")");
+      List<String[]> r = new ArrayList<>();
+      for (int i = 1; i < linhas.size(); i++) {
+         if (linhas.get(i).isBlank()) continue;
+         List<String> c = partirCsv(linhas.get(i), sep);
+         if (c.size() <= Math.max(iId, Math.max(iNome, iUrl))) continue;
+         String url = c.get(iUrl).trim();
+         if (url.isEmpty()) continue;
+         r.add(new String[] { c.get(iId).trim(), c.get(iNome).trim(), url });
+      }
+      return r;
+   }
+
+   private static List<String> partirCsv(String linha, char sep) {
+      List<String> r = new ArrayList<>();
+      StringBuilder b = new StringBuilder();
+      boolean aspas = false;
+      for (int i = 0; i < linha.length(); i++) {
+         char ch = linha.charAt(i);
+         if (aspas) {
+            if (ch == '"' && i + 1 < linha.length() && linha.charAt(i + 1) == '"') {
+               b.append('"');
+               i++;
+            } else if (ch == '"') aspas = false;
+            else b.append(ch);
+         } else if (ch == '"') aspas = true;
+         else if (ch == sep) {
+            r.add(b.toString());
+            b.setLength(0);
+         } else b.append(ch);
+      }
+      r.add(b.toString());
+      return r;
    }
 
    // ───────────────────────────────── principal ─────────────────────────────────

@@ -82,7 +82,10 @@ acabar; estado em `zsgo_web_cegid_documento`. Nome no bucket = nº da fatura
 com "/"→"-" ("FR 2024-3342.pdf", formato dos que já lá estavam); pré-análise
 lista o bucket e não reenvia os que já existem. O mesmo download existe em
 Java sem a aplicação web (`cegid/CegidDownloadRun`, `cegid-download.bat`,
-argumentos PARTE DE) para dividir por vários PCs/ligações; mesmas regras
+argumentos PARTE DE) para dividir por vários PCs/ligações; sem acesso à BD:
+`cegid-lista.sql` (export CSV no pgAdmin, mesmo cálculo do nome) +
+`cegid-download-lista.bat` (modo "lista": só S3, feitas em <csv>.feitas.txt;
+depois "Pré-análise do S3" na web). Mesmas regras
 (nome, ritmo, tabela) — mudanças têm de ser feitas nos dois lados. Os links públicos do Cegid são
 `app1.business-pt.cegid.cloud/rus/public-rus/public_links/link/...`.
 
