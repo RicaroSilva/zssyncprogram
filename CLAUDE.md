@@ -80,7 +80,10 @@ related_to_user_id = fatura emitida a outra pessoa), `..._invoice_lines`
 Os PDFs copiam-se para o S3 do SeaweedFS (`cegid.s3.*`) antes de a licença
 acabar; estado em `zsgo_web_cegid_documento`. Nome no bucket = nº da fatura
 com "/"→"-" ("FR 2024-3342.pdf", formato dos que já lá estavam); pré-análise
-lista o bucket e não reenvia os que já existem. Os links públicos do Cegid são
+lista o bucket e não reenvia os que já existem. O mesmo download existe em
+Java sem a aplicação web (`cegid/CegidDownloadRun`, `cegid-download.bat`,
+argumentos PARTE DE) para dividir por vários PCs/ligações; mesmas regras
+(nome, ritmo, tabela) — mudanças têm de ser feitas nos dois lados. Os links públicos do Cegid são
 `app1.business-pt.cegid.cloud/rus/public-rus/public_links/link/...`.
 
 ## Por fazer / pedidos em espera
