@@ -176,14 +176,19 @@ async function vezNoCegid() {
   if (quando > agora) await espera(quando - agora);
 }
 function travaoRecebido() {
-  if (Date.now() - ritmo.ultimoCorte < 15_000) return;
+  // No máximo um corte por minuto (vários pedidos recebem o mesmo 429 ao mesmo
+  // tempo) e nunca abaixo de metade do ritmo inicial.
+  if (Date.now() - ritmo.ultimoCorte < 60_000) return;
   ritmo.ultimoCorte = Date.now();
   ritmo.semTravao = 0;
-  ritmo.porMinuto = Math.max(2, (ritmo.porMinuto || ritmoInicial()) * 0.8);
+  const minimo = Math.max(2, ritmoInicial() / 2);
+  ritmo.porMinuto = Math.max(minimo, (ritmo.porMinuto || ritmoInicial()) * 0.8);
   estado.paginasPorMinuto = Math.round(ritmo.porMinuto);
 }
 function pedidoCegidSemTravao() {
-  if (++ritmo.semTravao < 20) return;
+  // Abaixo do ritmo inicial recupera depressa (+1 a cada 10); acima, devagar (+1 a cada 20).
+  const passo = (ritmo.porMinuto || ritmoInicial()) < ritmoInicial() ? 10 : 20;
+  if (++ritmo.semTravao < passo) return;
   ritmo.semTravao = 0;
   ritmo.porMinuto = Math.min(ritmoMaximo(), (ritmo.porMinuto || ritmoInicial()) + 1);
   estado.paginasPorMinuto = Math.round(ritmo.porMinuto);
