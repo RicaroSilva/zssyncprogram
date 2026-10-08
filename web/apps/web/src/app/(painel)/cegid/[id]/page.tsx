@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { urlPublico } from "@/lib/cegid/armazenamento";
 import { notFound, redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth";
 import { pode } from "@/lib/exigir-permissao";
@@ -39,7 +40,7 @@ export default async function PaginaFaturaCegid({ params }: { params: Promise<{ 
         <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">{f.document_cw_number ?? `Fatura ${f.mpinv_id}`}</h1>
         <div className="flex flex-wrap gap-2">
           {f.copia_estado === "OK" && (
-            <a href={`/api/cegid/documento/${f.mpinv_id}`} target="_blank" rel="noreferrer" className={buttonVariants({})}>
+            <a href={urlPublico(f.copia_chave) ?? `/api/cegid/documento/${f.mpinv_id}`} target="_blank" rel="noreferrer" className={buttonVariants({})}>
               Abrir PDF guardado
             </a>
           )}

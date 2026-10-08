@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { urlPublico } from "@/lib/cegid/armazenamento";
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth";
 import { pode } from "@/lib/exigir-permissao";
@@ -169,7 +170,7 @@ export default async function PaginaCegid({ searchParams }: { searchParams: Prom
                 </td>
                 <td className="whitespace-nowrap py-2">
                   {f.copia_estado === "OK" ? (
-                    <a href={`/api/cegid/documento/${f.mpinv_id}`} target="_blank" rel="noreferrer" className="font-semibold text-accent hover:underline">
+                    <a href={urlPublico(f.copia_chave) ?? `/api/cegid/documento/${f.mpinv_id}`} target="_blank" rel="noreferrer" className="font-semibold text-accent hover:underline">
                       PDF guardado
                     </a>
                   ) : f.copia_estado === "ERRO" ? (

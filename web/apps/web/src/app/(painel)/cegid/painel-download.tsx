@@ -261,7 +261,7 @@ export function PainelDownload({ inicial, podeIniciar, destino }: { inicial: Pro
                 <span className="text-muted-foreground">
                   {String(u.mes).padStart(2, "0")}/{u.ano} · cliente {u.user_id}
                 </span>
-                <a href={`/api/cegid/documento/${u.mpinv_id}`} target="_blank" rel="noreferrer" className="text-accent hover:underline">
+                <a href={u.url ?? `/api/cegid/documento/${u.mpinv_id}`} target="_blank" rel="noreferrer" className="text-accent hover:underline">
                   PDF
                 </a>
               </li>

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { prisma } from "../db";
 import { cfgInt, cfgOu } from "../config";
 import { descreverErro } from "../erros";
-import { armazenamentoConfigurado, prefixoChaves, type Armazenamento } from "./armazenamento";
+import { armazenamentoConfigurado, prefixoChaves, urlPublico, type Armazenamento } from "./armazenamento";
 
 /**
  * Descarregar todos os documentos do Cegid (document_cw_url das
@@ -99,15 +99,18 @@ export interface Enviada {
   mes: number;
   chave: string | null;
   atualizado_em: Date;
+  /** Endereço do PDF no S3 (ou null → abrir pela aplicação). */
+  url: string | null;
 }
 
 /** As últimas faturas guardadas no S3 pelo download (não as que já lá estavam). */
 export async function ultimasEnviadas(n = 5): Promise<Enviada[]> {
-  return prisma.$queryRaw<Enviada[]>`
+  const linhas = await prisma.$queryRaw<Omit<Enviada, "url">[]>`
     SELECT d.mpinv_id, i.document_cw_number AS numero, i.user_id::text AS user_id, i.year::int AS ano, i.month::int AS mes, d.chave, d.atualizado_em
     FROM zsgo_web_cegid_documento d JOIN lp_cloudware_monthly_processing_invoices i ON i.mpinv_id = d.mpinv_id
     WHERE d.estado = 'OK' AND d.tentativas > 0
     ORDER BY d.atualizado_em DESC LIMIT ${n}`;
+  return linhas.map((l) => ({ ...l, url: urlPublico(l.chave) }));
 }
 
 export function pararDownload(): void {

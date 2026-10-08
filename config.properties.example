@@ -392,6 +392,9 @@ creditnote.query=\
 #cegid.s3.access_key=
 #cegid.s3.secret_key=
 #cegid.s3.region=us-east-1
+# Endereço público dos PDFs (os links "PDF" abrem-no diretamente). Por omissão
+# endpoint/bucket; "nao" para abrir sempre pela aplicação (bucket privado).
+#cegid.s3.url_publico=https://seaweeds3.lusopay.com/invoice
 # Pasta dentro do bucket (vazio = os PDFs ficam diretamente no bucket):
 #cegid.s3.prefixo=
 # Sem S3, numa pasta:

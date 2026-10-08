@@ -42,6 +42,30 @@ export function armazenamentoConfigurado(): Armazenamento | null {
   return pasta ? new ArmazenamentoPasta(resolve(pasta)) : null;
 }
 
+/**
+ * Endereço público de um ficheiro guardado, para abrir o PDF diretamente no
+ * S3 (ex.: https://seaweeds3.lusopay.com/invoice/FR%202024-3329.pdf). Por
+ * omissão é endpoint/bucket/chave; cegid.s3.url_publico muda a base. Sem S3
+ * (pasta), ou com cegid.s3.url_publico=nao, devolve null e a página usa o
+ * servidor da aplicação.
+ */
+export function urlPublico(chave: string | null | undefined): string | null {
+  if (!chave) return null;
+  let base: string | null;
+  try {
+    base = cfgOu("cegid.s3.url_publico", null);
+    if (base === "nao") return null;
+    if (!base) {
+      const endpoint = cfgOu("cegid.s3.endpoint", null);
+      if (!endpoint) return null;
+      base = `${endpoint.replace(/\/+$/, "")}/${cfgOu("cegid.s3.bucket", "faturas-cegid")}`;
+    }
+  } catch {
+    return null;
+  }
+  return `${base.replace(/\/+$/, "")}/${chave.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 /** Prefixo das chaves (ex.: "cegid/"). */
 export function prefixoChaves(): string {
   // Por omissão os ficheiros ficam na raiz do bucket; cegid.s3.prefixo=pasta/ põe-nos numa pasta.
