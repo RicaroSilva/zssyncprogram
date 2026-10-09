@@ -4,7 +4,7 @@ import { obterSessaoAtual } from "@/lib/auth";
 import { pode } from "@/lib/exigir-permissao";
 import { nomesUtilizadoresCyclos } from "@/lib/cyclos";
 import { chaveMes, euros, lerMes, nomeMesTitulo } from "@/lib/formatos";
-import { alertas, intervalo, lerMesOpcional, rankingClientes, ultimoMesComReceita, type TipoAlerta } from "@/lib/analise/dados";
+import { alertas, intervalo, lerMesOpcional, rankingClientes, ultimoMesComReceita } from "@/lib/analise/dados";
 import { Paginacao } from "@/components/paginacao";
 import { cn } from "@/lib/utils";
 import { FiltrosAnalise, lerPeriodo } from "./filtros";
@@ -14,13 +14,6 @@ export const dynamic = "force-dynamic";
 const POR_PAGINA = 50;
 const n = (x: number) => new Intl.NumberFormat("pt-PT", { maximumFractionDigits: 0 }).format(x);
 const pct = (x: number) => `${(x * 100).toLocaleString("pt-PT", { maximumFractionDigits: 1 })}%`;
-
-const ALERTAS: Array<{ tipo: TipoAlerta; titulo: string; texto: string; tom: string }> = [
-  { tipo: "caiu", titulo: "A cair", texto: "Faturaram menos de 70% da média dos 3 meses anteriores", tom: "text-destructive" },
-  { tipo: "parou", titulo: "Pararam", texto: "Não faturaram este mês, mas faturavam antes", tom: "text-destructive" },
-  { tipo: "cresceu", titulo: "A crescer", texto: "Faturaram mais de 130% da média dos 3 meses anteriores", tom: "text-success" },
-  { tipo: "novo", titulo: "Novos", texto: "Primeira faturação nos últimos 12 meses", tom: "text-success" },
-];
 
 function Variacao({ v }: { v: number | null }) {
   if (v === null) return <span className="text-muted-foreground">—</span>;
@@ -80,48 +73,12 @@ export default async function PaginaAnaliseClientes({ searchParams }: { searchPa
           <p className="mt-2 font-heading text-3xl font-bold">{pct(total ? top10 / total : 0)}</p>
           <p className="mt-1 text-sm text-muted-foreground">{metade > 0 ? `${n(metade)} cliente(s) fazem metade da receita` : ""}</p>
         </div>
-        <div className="rounded-card border border-border bg-surface p-5">
+        <Link href={`/analise/crescimento?mes=${chaveMes(mes)}`} className="rounded-card border border-border bg-surface p-5 hover:bg-muted">
           <p className="text-sm font-semibold text-muted-foreground">Alertas em {nomeMesTitulo(mes).toLowerCase()}</p>
           <p className="mt-2 font-heading text-3xl font-bold">{n(listaAlertas.filter((a) => a.tipo === "caiu" || a.tipo === "parou").length)}</p>
-          <p className="mt-1 text-sm text-muted-foreground">clientes a cair ou que pararam</p>
-        </div>
+          <p className="mt-1 text-sm text-muted-foreground">clientes a cair ou que pararam — ver em Crescimento e queda</p>
+        </Link>
       </div>
-
-      <section className="mt-10">
-        <div className="flex flex-wrap items-baseline justify-between gap-3">
-          <h2 className="text-2xl font-bold tracking-tight">Alertas de {nomeMesTitulo(mes).toLowerCase()}</h2>
-          <a href={csv("alertas")} className="text-sm font-semibold text-accent hover:underline">
-            Exportar alertas (Excel)
-          </a>
-        </div>
-        <div className="mt-4 grid gap-4 lg:grid-cols-4">
-          {ALERTAS.map((a) => {
-            const lista = listaAlertas.filter((x) => x.tipo === a.tipo);
-            return (
-              <div key={a.tipo} className="rounded-card border border-border bg-surface p-5">
-                <h3 className={cn("font-heading text-base font-semibold", a.tom)}>
-                  {a.titulo} <span className="text-muted-foreground">({n(lista.length)})</span>
-                </h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">{a.texto}</p>
-                <ul className="mt-3 space-y-2 text-sm">
-                  {lista.slice(0, 8).map((x) => (
-                    <li key={x.user_id}>
-                      <Link href={`/analise/cliente/${x.user_id}?mes=${chaveMes(mes)}`} className="block truncate text-accent hover:underline" title={nomesTodos.get(x.user_id)}>
-                        <b className="font-semibold">{x.user_id}</b> {nomesTodos.get(x.user_id)}
-                      </Link>
-                      <span className="block text-xs tabular-nums text-muted-foreground" title="Média dos 3 meses anteriores → este mês">
-                        {a.tipo === "novo" ? euros(x.valor) : `${euros(x.media)} → ${euros(x.valor)}`}
-                      </span>
-                    </li>
-                  ))}
-                  {lista.length === 0 && <li className="text-muted-foreground">Nenhum.</li>}
-                  {lista.length > 8 && <li className="text-xs text-muted-foreground">e mais {lista.length - 8} (exportar para ver todos)</li>}
-                </ul>
-              </div>
-            );
-          })}
-        </div>
-      </section>
 
       <section className="mt-10">
         <div className="flex flex-wrap items-center justify-between gap-4">

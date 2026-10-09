@@ -46,6 +46,7 @@ const SEPARADORES: SeparadorMenu[] = [
         titulo: "Análise",
         itens: [
           { href: "/analise", nome: "Clientes", recurso: "RESUMO" },
+          { href: "/analise/crescimento", nome: "Crescimento e queda", recurso: "RESUMO" },
           { href: "/analise/rubricas", nome: "Rubricas", recurso: "RESUMO" },
         ],
       },
