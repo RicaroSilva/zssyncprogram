@@ -31,6 +31,7 @@ regras de negócio já validadas (ver `../CLAUDE.md`).
 | 4 | Tarefas agendadas (agendador dentro do servidor, mesma tabela e mesma reserva do Java, hora de Lisboa) e páginas Utilizadores/Perfis | ✅ |
 | 4b | Página principal com gráficos (faturado por mês, top clientes, rubricas, regiões) e módulo **ZSGO — gestão direta**: tudo o que a API 1.3 permite (listas com filtros, detalhe, criar/editar/eliminar, anular, PDF/XML, ativar/desativar, documentos por liquidar, SAF-T), gerado a partir da especificação (`docs/zsgo-api-1.3.yaml` → `scripts-zsgo-spec.py`) | ✅ |
 | 4c | Histórico Cegid (tabelas `lp_cloudware_*`, só leitura) e cópia de todos os PDFs para o S3 (SeaweedFS) antes de a licença acabar | ✅ |
+| 4d | Análise: ranking de clientes (variação, peso, acumulado), alertas (a cair, pararam, a crescer, novos), rubricas, ficha por cliente, exportação CSV — ZSGO − NC + Cegid, valores com impostos. Por fazer: custos por rubrica → margem/lucro | ✅ |
 | 5 | Faturação ocasional (produto `ocasionalTransactions`, uma fatura por pagamento, diária) — quando o utilizador especificar | ⏳ |
 | 6 | Desligar o programa em Java | ⏳ |
 

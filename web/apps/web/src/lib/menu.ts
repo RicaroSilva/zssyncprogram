@@ -39,6 +39,19 @@ function zsgo(slug: string, resumo: string, novo?: string): ItemMenu[] {
 const SEPARADORES: SeparadorMenu[] = [
   { nome: "Dashboard", href: "/resumo", grupos: [{ titulo: "Dashboard", itens: [{ href: "/resumo", nome: "Resumo", recurso: "RESUMO" }] }] },
   {
+    nome: "Análise",
+    href: "/analise",
+    grupos: [
+      {
+        titulo: "Análise",
+        itens: [
+          { href: "/analise", nome: "Clientes", recurso: "RESUMO" },
+          { href: "/analise/rubricas", nome: "Rubricas", recurso: "RESUMO" },
+        ],
+      },
+    ],
+  },
+  {
     nome: "Entidades",
     href: "/clientes",
     grupos: [
