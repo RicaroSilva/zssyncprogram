@@ -20,6 +20,14 @@
   --destructive: #ba1a1a;
   --success: #2f8f3e;
 
+  /* Cores das séries nos gráficos (categóricas, ordem fixa; validadas para daltonismo). */
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
+  --serie-3: #1baf7a;
+  --serie-4: #eda100;
+  --serie-5: #e87ba4;
+  --serie-outras: #a8a6a0;
+
   --radius-card: 1rem;
 }
 
@@ -40,6 +48,13 @@
   --ring: #c9a227;
   --destructive: #ef5350;
   --success: #5cc46a;
+
+  --serie-1: #3987e5;
+  --serie-2: #d95926;
+  --serie-3: #199e70;
+  --serie-4: #c98500;
+  --serie-5: #d55181;
+  --serie-outras: #5d7185;
 }
 
 * {

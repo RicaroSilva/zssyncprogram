@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth";
 import { pode } from "@/lib/exigir-permissao";
 import { nomesUtilizadoresCyclos } from "@/lib/cyclos";
-import { chaveMes, euros, lerMes, nomeMesTitulo } from "@/lib/formatos";
-import { alertas, intervalo, lerMesOpcional, rankingClientes, ultimoMesComReceita } from "@/lib/analise/dados";
+import { chaveMes, euros, lerMes, nomeMesTitulo, somarMeses } from "@/lib/formatos";
+import { alertas, intervalo, lerMesOpcional, rankingClientes, receitaPorClienteMes, ultimoMesComReceita } from "@/lib/analise/dados";
+import { GraficoAnel, GraficoColunas } from "@/components/graficos";
 import { Paginacao } from "@/components/paginacao";
 import { cn } from "@/lib/utils";
 import { FiltrosAnalise, lerPeriodo } from "./filtros";
@@ -31,7 +32,20 @@ export default async function PaginaAnaliseClientes({ searchParams }: { searchPa
   const periodo = lerPeriodo(sp.periodo);
   const mes = lerMesOpcional(sp.mes) ?? (await ultimoMesComReceita()) ?? lerMes(undefined);
   const iv = intervalo(periodo, mes);
-  const [{ linhas, total, totalAnterior }, listaAlertas] = await Promise.all([rankingClientes(iv), alertas(mes)]);
+  const de12 = somarMeses(mes, -11);
+  const [{ linhas, total, totalAnterior }, listaAlertas, porMes] = await Promise.all([rankingClientes(iv), alertas(mes), receitaPorClienteMes(de12, mes)]);
+  const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+  const serieMeses = Array.from({ length: 12 }, (_, i) => {
+    const m = somarMeses(de12, i);
+    const doMes = porMes.filter((l) => l.ano === m.ano && l.mes === m.mes);
+    return {
+      rotulo: `${MESES_CURTOS[m.mes - 1]}${m.mes === 1 || i === 0 ? ` ${String(m.ano).slice(2)}` : ""}`,
+      valor: doMes.reduce((s, l) => s + l.valor, 0),
+      detalhe: `${new Set(doMes.filter((l) => l.valor > 0.004).map((l) => l.user_id)).size} clientes`,
+      destaque: i === 11,
+    };
+  });
+  const fatia = (de: number, ate?: number) => linhas.slice(de, ate).reduce((s, l) => s + Math.max(0, l.valor), 0);
 
   const q = sp.q?.trim();
   const nomesTodos = await nomesUtilizadoresCyclos([...new Set([...linhas.map((l) => l.user_id), ...listaAlertas.map((a) => a.user_id)])].map((x) => BigInt(x)));
@@ -78,6 +92,29 @@ export default async function PaginaAnaliseClientes({ searchParams }: { searchPa
           <p className="mt-2 font-heading text-3xl font-bold">{n(listaAlertas.filter((a) => a.tipo === "caiu" || a.tipo === "parou").length)}</p>
           <p className="mt-1 text-sm text-muted-foreground">clientes a cair ou que pararam — ver em Crescimento e queda</p>
         </Link>
+      </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-2">
+          <GraficoAnel
+            titulo="Quem traz a receita"
+            subtitulo={`Peso dos maiores clientes · ${iv.nome}`}
+            fatias={[
+              { rotulo: "10 maiores clientes", valor: fatia(0, 10) },
+              { rotulo: "Do 11.º ao 50.º", valor: fatia(10, 50) },
+              { rotulo: "Do 51.º ao 200.º", valor: fatia(50, 200) },
+              { rotulo: "Restantes", valor: fatia(200) },
+            ]}
+            ordenar={false}
+            formato="euro"
+            rotuloTotal="Receita"
+            rotuloValor="Receita"
+            vazio="Sem receita neste período."
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <GraficoColunas titulo="Receita por mês" subtitulo="Últimos 12 meses (todos os clientes)" pontos={serieMeses} formato="euro" formatoEixo="euro-compacto" rotuloValor="Receita" largura={700} />
+        </div>
       </div>
 
       <section className="mt-10">

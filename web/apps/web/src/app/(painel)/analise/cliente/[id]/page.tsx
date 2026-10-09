@@ -4,8 +4,8 @@ import { obterSessaoAtual } from "@/lib/auth";
 import { pode } from "@/lib/exigir-permissao";
 import { nomesUtilizadoresCyclos } from "@/lib/cyclos";
 import { chaveMes, euros, lerMes, somarMeses } from "@/lib/formatos";
-import { intervalo, lerMesOpcional, receitaPorClienteMes, rubricas, ultimoMesComReceita } from "@/lib/analise/dados";
-import { GraficoColunas } from "@/components/graficos";
+import { intervalo, lerMesOpcional, receitaPorClienteMes, rubricas, rubricasPorMes, ultimoMesComReceita } from "@/lib/analise/dados";
+import { GraficoAnel, GraficoColunas, GraficoEmpilhado } from "@/components/graficos";
 
 export const dynamic = "force-dynamic";
 
@@ -20,11 +20,12 @@ export default async function PaginaAnaliseCliente({ params, searchParams }: { p
   const sp = await searchParams;
   const mes = lerMesOpcional(sp.mes) ?? (await ultimoMesComReceita()) ?? lerMes(undefined);
   const de = somarMeses(mes, -23);
-  const [linhas, tudo, mix12, nomes] = await Promise.all([
+  const [linhas, tudo, mix12, nomes, evolucao] = await Promise.all([
     receitaPorClienteMes(de, mes, id),
     receitaPorClienteMes({ ano: 2015, mes: 1 }, mes, id),
     rubricas(intervalo("12m", mes), id),
     nomesUtilizadoresCyclos([BigInt(id)]),
+    rubricasPorMes(somarMeses(mes, -11), mes, id),
   ]);
   const serie = Array.from({ length: 24 }, (_, i) => {
     const m = somarMeses(de, i);
@@ -102,6 +103,31 @@ export default async function PaginaAnaliseCliente({ params, searchParams }: { p
           formatoEixo="euro-compacto"
           rotuloValor="Receita"
         />
+      </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-2">
+          <GraficoAnel
+            titulo="De onde vem a receita"
+            subtitulo="Peso de cada rubrica nos últimos 12 meses"
+            fatias={mix12.map((r) => ({ rotulo: r.rubrica, valor: r.valor, detalhe: `${n(r.transacoes)} transações` }))}
+            formato="euro"
+            rotuloTotal="12 meses"
+            rotuloValor="Receita"
+            vazio="Sem rubricas nos últimos 12 meses."
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <GraficoEmpilhado
+            titulo="Rubricas mês a mês"
+            subtitulo="Últimos 12 meses"
+            series={evolucao.rubricas.map((r) => r.rubrica)}
+            colunas={evolucao.meses.map((m) => ({ rotulo: m.rotulo.slice(0, 3), valores: m.valores }))}
+            formato="euro"
+            formatoEixo="euro-compacto"
+            largura={700}
+          />
+        </div>
       </div>
 
       <h2 className="mt-10 text-2xl font-bold tracking-tight">Rubricas nos últimos 12 meses</h2>

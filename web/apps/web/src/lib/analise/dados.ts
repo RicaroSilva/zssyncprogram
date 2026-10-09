@@ -192,36 +192,43 @@ export interface LinhaRubrica {
   clientes: number;
 }
 
-/** Receita por rubrica no período (ZSGO pelas linhas das faturas emitidas + Cegid pela descrição da rubrica). */
-export async function rubricas(iv: Intervalo, cliente?: string): Promise<LinhaRubrica[]> {
+type LinhaRubricaMes = { ano: number; mes: number; rubrica: string; valor: number; transacoes: number; cliente: string };
+
+/** Linhas por rubrica, cliente e mês (ZSGO pelas linhas das faturas emitidas + Cegid pela descrição da rubrica). */
+async function linhasRubricas(iv: { de: Mes; ate: Mes }, cliente?: string): Promise<LinhaRubricaMes[]> {
   const a = am(iv.de);
   const b = am(iv.ate);
   const id = cliente ? BigInt(cliente) : null;
   const comCegid = await temHistoricoCegid().catch(() => false);
-  const zsgo = prisma.$queryRaw<Array<{ rubrica: string; valor: number; transacoes: number; cliente: string }>>`
-    SELECT COALESCE(NULLIF(l.rubrica, ''), l.product_reference, '—') AS rubrica, l.cliente_id::text AS cliente,
+  const zsgo = prisma.$queryRaw<LinhaRubricaMes[]>`
+    SELECT l.ano::int AS ano, l.mes::int AS mes, COALESCE(NULLIF(l.rubrica, ''), l.product_reference, '—') AS rubrica, l.cliente_id::text AS cliente,
            SUM(l.valor)::float AS valor, COALESCE(SUM(l.nr_transacoes), 0)::float AS transacoes
     FROM zsgo_invoice_line_detail l
     WHERE (l.ano * 12 + l.mes) BETWEEN ${a} AND ${b} AND (${id}::bigint IS NULL OR l.cliente_id = ${id}::bigint)
       AND EXISTS (SELECT 1 FROM zsgo_invoice_sync f WHERE f.user_id = l.cliente_id AND f.ano = l.ano AND f.mes = l.mes AND f.status = 'SINCRONIZADO')
-    GROUP BY 1, 2`;
+    GROUP BY 1, 2, 3, 4`;
   const cegid = comCegid
-    ? prisma.$queryRaw<Array<{ rubrica: string; valor: number; transacoes: number; cliente: string }>>`
-        SELECT COALESCE(
+    ? prisma.$queryRaw<LinhaRubricaMes[]>`
+        SELECT t.ano, t.mes, COALESCE(
                  (SELECT rm.rubric_description FROM lp_cloudware_rubrics_mappings rm WHERE rm.transaction_internal_name = t.rubric_code LIMIT 1),
                  (SELECT rm.rubric_description FROM lp_cloudware_rubrics_mappings rm WHERE rm.cw_service_code = t.rubric_code LIMIT 1),
                  t.rubric_code) AS rubrica, t.cliente, t.valor, t.transacoes
         FROM (
-          SELECT l.rubric_code, i.user_id::text AS cliente, SUM(l.total_amount_with_taxes)::float AS valor, COALESCE(SUM(l.total_transactions), 0)::float AS transacoes
+          SELECT i.year::int AS ano, i.month::int AS mes, l.rubric_code, i.user_id::text AS cliente,
+                 SUM(l.total_amount_with_taxes)::float AS valor, COALESCE(SUM(l.total_transactions), 0)::float AS transacoes
           FROM lp_cloudware_monthly_processing_invoices i
           JOIN lp_cloudware_monthly_processing_invoice_lines l ON l.mpinv_id = i.mpinv_id
           WHERE (i.year * 12 + i.month) BETWEEN ${a} AND ${b} AND (${id}::bigint IS NULL OR i.user_id = ${id}::bigint)
-          GROUP BY 1, 2
+          GROUP BY 1, 2, 3, 4
         ) t`
     : Promise.resolve([]);
   const [z, c] = await Promise.all([zsgo, cegid]);
+  return [...z, ...c];
+}
+
+function agruparRubricas(linhas: LinhaRubricaMes[]): LinhaRubrica[] {
   const mapa = new Map<string, { valor: number; transacoes: number; clientes: Set<string> }>();
-  for (const r of [...z, ...c]) {
+  for (const r of linhas) {
     const m = mapa.get(r.rubrica) ?? { valor: 0, transacoes: 0, clientes: new Set<string>() };
     m.valor += r.valor ?? 0;
     m.transacoes += r.transacoes ?? 0;
@@ -231,6 +238,29 @@ export async function rubricas(iv: Intervalo, cliente?: string): Promise<LinhaRu
   return [...mapa.entries()]
     .map(([rubrica, m]) => ({ rubrica, valor: m.valor, transacoes: m.transacoes, clientes: m.clientes.size }))
     .sort((x, y) => y.valor - x.valor);
+}
+
+/** Receita por rubrica no período. */
+export async function rubricas(iv: Intervalo, cliente?: string): Promise<LinhaRubrica[]> {
+  return agruparRubricas(await linhasRubricas(iv, cliente));
+}
+
+export interface RubricasPorMes {
+  /** Rubricas pela ordem do total (as maiores primeiro). */
+  rubricas: LinhaRubrica[];
+  meses: Array<{ mes: Mes; rotulo: string; valores: Record<string, number> }>;
+}
+
+/** Receita de cada rubrica mês a mês (para os gráficos de evolução). */
+export async function rubricasPorMes(de: Mes, ate: Mes, cliente?: string): Promise<RubricasPorMes> {
+  const linhas = await linhasRubricas({ de, ate }, cliente);
+  const meses: RubricasPorMes["meses"] = [];
+  for (let m = de; am(m) <= am(ate); m = somarMeses(m, 1)) meses.push({ mes: m, rotulo: nomeCurto(m), valores: {} });
+  for (const l of linhas) {
+    const alvo = meses[l.ano * 12 + l.mes - am(de)];
+    if (alvo) alvo.valores[l.rubrica] = (alvo.valores[l.rubrica] ?? 0) + (l.valor ?? 0);
+  }
+  return { rubricas: agruparRubricas(linhas), meses };
 }
 
 /** O último mês com faturação (ZSGO ou Cegid), para abrir a análise. */

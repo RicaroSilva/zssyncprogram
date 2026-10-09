@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import { obterSessaoAtual } from "@/lib/auth";
 import { pode } from "@/lib/exigir-permissao";
-import { chaveMes, euros, lerMes } from "@/lib/formatos";
-import { intervalo, lerMesOpcional, rubricas, ultimoMesComReceita } from "@/lib/analise/dados";
-import { GraficoBarras } from "@/components/graficos";
+import { chaveMes, euros, lerMes, somarMeses } from "@/lib/formatos";
+import { intervalo, lerMesOpcional, rubricas, rubricasPorMes, ultimoMesComReceita } from "@/lib/analise/dados";
+import { corDaPosicao } from "@/lib/cores-series";
+import { GraficoAnel, GraficoBarras, GraficoEmpilhado } from "@/components/graficos";
 import { FiltrosAnalise, lerPeriodo } from "../filtros";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,10 @@ export default async function PaginaAnaliseRubricas({ searchParams }: { searchPa
   const periodo = lerPeriodo(sp.periodo);
   const mes = lerMesOpcional(sp.mes) ?? (await ultimoMesComReceita()) ?? lerMes(undefined);
   const iv = intervalo(periodo, mes);
-  const lista = await rubricas(iv);
+  // Evolução: os meses do período, no mínimo 12 e no máximo 24.
+  const am = (m: { ano: number; mes: number }) => m.ano * 12 + m.mes;
+  const deEvolucao = am(mes) - am(iv.de) < 11 ? somarMeses(mes, -11) : am(mes) - am(iv.de) > 23 ? somarMeses(mes, -23) : iv.de;
+  const [lista, evolucao] = await Promise.all([rubricas(iv), rubricasPorMes(deEvolucao, mes)]);
   const total = lista.reduce((s, r) => s + r.valor, 0);
   const transacoes = lista.reduce((s, r) => s + r.transacoes, 0);
 
@@ -48,14 +52,41 @@ export default async function PaginaAnaliseRubricas({ searchParams }: { searchPa
         </div>
       </div>
 
+      <div className="mt-6 grid gap-6 lg:grid-cols-5">
+        <div className="lg:col-span-2">
+          <GraficoAnel
+            titulo="De onde vem a receita"
+            subtitulo={`Peso de cada rubrica · ${iv.nome}`}
+            fatias={lista.map((r) => ({ rotulo: r.rubrica, valor: r.valor, detalhe: `${n(r.transacoes)} transações · ${n(r.clientes)} clientes` }))}
+            formato="euro"
+            rotuloTotal="Receita"
+            rotuloValor="Receita"
+            vazio="Sem receita neste período."
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <GraficoBarras
+            titulo="Receita por rubrica"
+            subtitulo={iv.nome}
+            pontos={lista.slice(0, 10).map((r, i) => ({ rotulo: r.rubrica, valor: r.valor, cor: corDaPosicao(i), detalhe: `${n(r.transacoes)} transações · ${n(r.clientes)} clientes` }))}
+            formato="euro"
+            rotuloValor="Receita"
+            vazio="Sem receita neste período."
+          />
+        </div>
+      </div>
+
       <div className="mt-6">
-        <GraficoBarras
-          titulo="Receita por rubrica"
-          subtitulo={iv.nome}
-          pontos={lista.slice(0, 15).map((r) => ({ rotulo: r.rubrica, valor: r.valor, detalhe: `${n(r.transacoes)} transações · ${n(r.clientes)} clientes` }))}
+        <GraficoEmpilhado
+          titulo="Rubricas mês a mês"
+          subtitulo="Quanto cada rubrica faturou em cada mês — escolha “% do mês” para ver o peso"
+          series={evolucao.rubricas.map((r) => r.rubrica)}
+          colunas={evolucao.meses.map((m, i) => ({
+            rotulo: m.mes.mes === 1 || i === 0 ? m.rotulo.replace(/ (\d\d)(\d\d)$/, " $2") : m.rotulo.slice(0, 3),
+            valores: m.valores,
+          }))}
           formato="euro"
-          rotuloValor="Receita"
-          vazio="Sem receita neste período."
+          formatoEixo="euro-compacto"
         />
       </div>
 
